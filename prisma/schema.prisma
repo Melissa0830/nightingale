@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +8,231 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+// Human user roles only. Doctor/Nurse are NOT user roles.
+enum Role {
+  Patient
+  Staff
+  Clinician
+  Admin
+}
+
+// Extends Role with "system" for AI-scribed entries and system_event timeline entries.
+enum EntryAuthorRole {
+  Patient
+  Staff
+  Clinician
+  Admin
+  system
+}
+
+// Timeline entry types. ai_doctor/nurse_consult refer to note types, not user roles.
+enum EntryType {
+  patient_session_summary
+  ai_doctor_consult_summary
+  ai_nurse_consult_summary
+  staff_note
+  clinician_note
+  system_event
+}
+
+// Provenance source type for AI-scribed entries. Manual notes and system events use none.
+enum ProvenanceType {
+  patient_session
+  doctor_consult
+  nurse_consult
+  none
+}
+
+// Audit log action types. Metadata only — no PHI stored.
+enum AuditAction {
+  note_created
+  note_updated
+  note_reverted
+  conflict_flagged
+}
+
+// Accept/reject feedback state for Highlight importance (self-learning bonus).
+enum FeedbackStatus {
+  pending
+  accepted
+  rejected
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Clinic {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users       User[]
+  patients    Patient[]
+  auditEvents AuditEvent[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clinicId  String
+  role      Role
+  email     String   @unique
+  name      String
+  // Only set for users with role=Patient; links to their Patient record for RBAC.
+  patientId String?  @unique
+  createdAt DateTime @default(now())
+
+  clinic           Clinic          @relation(fields: [clinicId], references: [id])
+  patientProfile   Patient?        @relation("UserPatientProfile", fields: [patientId], references: [id])
+  timelineEntries  TimelineEntry[] @relation("EntryAuthor")
+  comments         Comment[]       @relation("CommentAuthor")
+  assignedComments Comment[]       @relation("CommentAssignee")
+  versions         Version[]       @relation("VersionEditor")
+  auditEvents      AuditEvent[]    @relation("AuditActor")
+}
+
+model Patient {
+  id          String   @id @default(cuid())
+  clinicId    String
+  // Synthetic display name only. No real PHI.
+  displayName String
+  createdAt   DateTime @default(now())
+
+  clinic          Clinic          @relation(fields: [clinicId], references: [id])
+  user            User?           @relation("UserPatientProfile")
+  timelineEntries TimelineEntry[]
+  highlights      Highlight[]
+  auditEvents     AuditEvent[]    @relation("AuditPatient")
+}
+
+model TimelineEntry {
+  id             String          @id @default(cuid())
+  patientId      String
+  authorRole     EntryAuthorRole
+  // Null for system-generated entries (AI scribe, system_event).
+  authorId       String?
+  type           EntryType
+  content        String
+  // Nullable: system_event entries do not belong to a section.
+  // String (not enum) to allow section identifiers to evolve without migrations.
+  sectionKey     String?
+  provenanceType ProvenanceType
+  // session_id or equivalent for AI entries; null for manual notes and system events.
+  provenanceId   String?
+  // Optimistic concurrency control. Client must submit current versionNumber on save.
+  // Stale version → API returns 409 Conflict.
+  versionNumber  Int             @default(1)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  author        User?          @relation("EntryAuthor", fields: [authorId], references: [id])
+  comments      Comment[]
+  versions      Version[]
+  highlights    Highlight[]
+  aiScribedNote AiScribedNote?
+  auditEvents   AuditEvent[]   @relation("AuditEntry")
+
+  @@index([patientId, createdAt])
+}
+
+model Comment {
+  id              String   @id @default(cuid())
+  timelineEntryId String
+  authorId        String
+  content         String
+  resolved        Boolean  @default(false)
+  assignedToId    String?
+  // Array of user IDs for @mention references. Resolution at application layer.
+  mentions        String[]
+  // Self-referential: null = thread root, non-null = reply.
+  parentId        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  timelineEntry TimelineEntry @relation(fields: [timelineEntryId], references: [id])
+  author        User          @relation("CommentAuthor", fields: [authorId], references: [id])
+  assignedTo    User?         @relation("CommentAssignee", fields: [assignedToId], references: [id])
+  parent        Comment?      @relation("CommentThread", fields: [parentId], references: [id])
+  replies       Comment[]     @relation("CommentThread")
+
+  @@index([timelineEntryId, createdAt])
+}
+
+model Version {
+  id              String   @id @default(cuid())
+  timelineEntryId String
+  // Full content snapshot copied before each save. UI-layer diff compares two snapshots.
+  content         String
+  versionNumber   Int
+  editorId        String
+  createdAt       DateTime @default(now())
+
+  timelineEntry TimelineEntry @relation(fields: [timelineEntryId], references: [id])
+  editor        User          @relation("VersionEditor", fields: [editorId], references: [id])
+  auditEvents   AuditEvent[]  @relation("AuditVersion")
+
+  @@unique([timelineEntryId, versionNumber])
+  @@index([timelineEntryId, createdAt])
+}
+
+model Highlight {
+  id         String         @id @default(cuid())
+  patientId  String
+  // Source-of-truth link: Highlight → TimelineEntry → provenanceType/provenanceId → source.
+  entryId    String
+  // Text-match anchor for locating the exact span in the source entry. No offset tracking.
+  quotedText String
+  // Required by brief Hard Constraint: every highlight must have a risk_reason.
+  riskReason String
+  // Computed importance: highlight_count * 1.0 + recency_bonus + risk_level_tag.
+  importance Float          @default(0)
+  // Accept/reject feedback state for simplified self-learning (Bonus).
+  feedback   FeedbackStatus @default(pending)
+  createdAt  DateTime       @default(now())
+
+  patient Patient       @relation(fields: [patientId], references: [id])
+  entry   TimelineEntry @relation(fields: [entryId], references: [id])
+
+  @@index([patientId, createdAt])
+}
+
+model AiScribedNote {
+  id              String         @id @default(cuid())
+  timelineEntryId String         @unique
+  // Original session identifier for provenance tracing.
+  sessionId       String
+  sourceType      ProvenanceType
+  // Confirms content passed through redactPHI() gateway before LLM use.
+  redacted        Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+
+  timelineEntry TimelineEntry @relation(fields: [timelineEntryId], references: [id])
+}
+
+model AuditEvent {
+  id              String          @id @default(cuid())
+  // Always clinic-scoped. Required even if actorId/patientId/timelineEntryId are null.
+  clinicId        String
+  // Null for system-initiated events.
+  actorId         String?
+  // EntryAuthorRole: system for system-initiated events; human role otherwise.
+  actorRole       EntryAuthorRole
+  patientId       String?
+  timelineEntryId String?
+  versionId       String?
+  action          AuditAction
+  // Metadata only. No patient name, raw note text, AI prompt, phone, or IC/ID.
+  createdAt       DateTime        @default(now())
+
+  clinic        Clinic         @relation(fields: [clinicId], references: [id])
+  actor         User?          @relation("AuditActor", fields: [actorId], references: [id])
+  patient       Patient?       @relation("AuditPatient", fields: [patientId], references: [id])
+  timelineEntry TimelineEntry? @relation("AuditEntry", fields: [timelineEntryId], references: [id])
+  version       Version?       @relation("AuditVersion", fields: [versionId], references: [id])
+
+  @@index([clinicId, createdAt])
+  @@index([timelineEntryId, createdAt])
 }
