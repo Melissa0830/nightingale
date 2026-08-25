@@ -1,14 +1,19 @@
 Nightingale — Third-Party Attribution
 
 Runtime Dependencies
+- @prisma/adapter-pg | 7.10.0 | Apache-2.0 | https://github.com/prisma/prisma
 - @prisma/client | 7.10.0 | Apache-2.0 | https://github.com/prisma/prisma
 - dotenv | 17.4.2 | BSD-2-Clause | https://github.com/motdotla/dotenv
+- jsonwebtoken | 9.0.3 | MIT | https://github.com/auth0/node-jsonwebtoken
 - next | 16.3.3 | MIT | https://github.com/vercel/next.js
+- pg | 8.23.0 | MIT | https://github.com/brianc/node-postgres
 - react | 19.2.8 | MIT | https://github.com/facebook/react
 - react-dom | 19.2.8 | MIT | https://github.com/facebook/react
 
 Development Dependencies
+- @types/jsonwebtoken | 9.0.10 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
 - @types/node | 20.19.43 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
+- @types/pg | 8.23.1 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
 - @types/react | 19.2.18 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
 - @types/react-dom | 19.2.5 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
 - eslint | 9.39.5 | MIT | https://github.com/eslint/eslint
