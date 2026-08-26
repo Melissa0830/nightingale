@@ -2,6 +2,7 @@ import { authenticate } from "@/lib/auth/jwt";
 import { assertClinicScope } from "@/lib/auth/clinic-scope";
 import { ApiError, toErrorResponse } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { EntryType } from "@/generated/prisma/client";
 
 export async function GET(
   request: Request,
@@ -84,7 +85,10 @@ export async function GET(
       // UI-layer concern (see the `diff` npm package decision), and no
       // summarization logic exists here or anywhere in this API.
       prisma.timelineEntry.findMany({
-        where: { patientId: patient.id },
+        where: {
+          patientId: patient.id,
+          type: { not: EntryType.system_event },
+        },
         select: {
           id: true,
           type: true,
