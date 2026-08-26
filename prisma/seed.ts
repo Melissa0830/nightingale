@@ -6,7 +6,7 @@ import {
   EntryAuthorRole,
   EntryType,
   ProvenanceType,
-} from "../src/generated/prisma/client";
+} from "../src/generated/prisma/client.ts";
 
 // Fixed synthetic IDs so re-running this script upserts the same rows
 // instead of creating duplicates. Never mutated outside this fixture set.
