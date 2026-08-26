@@ -3,6 +3,7 @@ import { assertClinicScope } from "@/lib/auth/clinic-scope";
 import { ApiError, toErrorResponse } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { EntryType } from "@/generated/prisma/client";
+import { classifyRiskFloor } from "@/lib/risk/classify-risk";
 
 export async function GET(
   request: Request,
@@ -111,6 +112,12 @@ export async function GET(
         assignedToId: c.assignedToId,
         createdAt: c.createdAt,
       })),
+      // riskFloor: deterministic, non-learned Core classification — see
+      // src/lib/risk/classify-risk.ts. Computed only from quotedText/
+      // riskReason already selected above; importance/feedback are never
+      // inputs, so a future Self-Learning weighting can never downgrade a
+      // deterministic "critical" result. Additive field only — no new
+      // query, no rescan of TimelineEntry, O(returned highlights) cost.
       riskHighlights: highlightRows.map((h) => ({
         id: h.id,
         entryId: h.entryId,
@@ -118,6 +125,7 @@ export async function GET(
         riskReason: h.riskReason,
         importance: h.importance,
         feedback: h.feedback,
+        riskFloor: classifyRiskFloor({ quotedText: h.quotedText, riskReason: h.riskReason }),
       })),
       recentChanges: recentEntryRows.map((e) => ({
         entryId: e.id,
