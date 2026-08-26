@@ -34,6 +34,7 @@ enum EntryType {
   patient_session_summary
   ai_doctor_consult_summary
   ai_nurse_consult_summary
+  ai_patient_session_summary
   staff_note
   clinician_note
   system_event
