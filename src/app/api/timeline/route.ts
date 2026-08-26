@@ -12,9 +12,10 @@ import {
 
 // Role -> the single EntryType each role may create via this endpoint.
 // AI/system-authored types (ai_doctor_consult_summary, ai_nurse_consult_summary,
-// system_event) are intentionally excluded — that ingestion path belongs to the
-// AI Scribe step and is not implemented yet. Admin has no entry here: Admin
-// never authors clinical content and is rejected before this map is consulted.
+// ai_patient_session_summary, system_event) are intentionally excluded — AI
+// Scribe types are created via POST /api/patients/:id/ai-scribe, and
+// system_event is server-internal only. Admin has no entry here: Admin never
+// authors clinical content and is rejected before this map is consulted.
 const ROLE_CREATABLE_TYPE: Partial<Record<Role, EntryType>> = {
   Patient: EntryType.patient_session_summary,
   Staff: EntryType.staff_note,
@@ -24,6 +25,7 @@ const ROLE_CREATABLE_TYPE: Partial<Record<Role, EntryType>> = {
 const UNSUPPORTED_TYPES = new Set<string>([
   EntryType.ai_doctor_consult_summary,
   EntryType.ai_nurse_consult_summary,
+  EntryType.ai_patient_session_summary,
   EntryType.system_event,
 ]);
 
@@ -69,7 +71,7 @@ export async function POST(request: Request): Promise<Response> {
     if (UNSUPPORTED_TYPES.has(requestedType)) {
       throw new ApiError(
         400,
-        `type '${requestedType}' is not creatable via this endpoint yet (AI Scribe ingestion is a separate, not-yet-implemented path)`,
+        `type '${requestedType}' is not creatable via this endpoint (use POST /api/patients/:id/ai-scribe for AI Scribe ingestion)`,
       );
     }
 
