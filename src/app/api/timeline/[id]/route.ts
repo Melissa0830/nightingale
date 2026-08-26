@@ -4,7 +4,12 @@ import { assertSectionOwnership } from "@/lib/auth/section-ownership";
 import { isPatientVisibleEntry } from "@/lib/auth/patient-filter";
 import { ApiError, toErrorResponse } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
-import { AuditAction, EntryAuthorRole, EntryType } from "@/generated/prisma/client";
+import {
+  AuditAction,
+  EntryAuthorRole,
+  EntryType,
+  ProvenanceType,
+} from "@/generated/prisma/client";
 
 // Nightingale Write Invariant:
 // Any server-side path that modifies TimelineEntry.content must:
@@ -227,6 +232,24 @@ export async function PUT(
               timelineEntryId: id,
               versionId: snapshot.id,
               action: AuditAction.conflict_flagged,
+            },
+          });
+
+          // Visible system_event counterpart to the conflict_flagged audit
+          // record above — the brief requires conflict flagging to appear
+          // on the timeline itself, not only in the audit trail. Same
+          // transaction: a failure here must roll back the whole write,
+          // never leaving the clinical content changed without this record.
+          await tx.timelineEntry.create({
+            data: {
+              patientId: entry.patientId,
+              authorRole: EntryAuthorRole.system,
+              authorId: null,
+              type: EntryType.system_event,
+              content: "Conflict flagged for clinician review",
+              sectionKey: null,
+              provenanceType: ProvenanceType.none,
+              provenanceId: null,
             },
           });
         }

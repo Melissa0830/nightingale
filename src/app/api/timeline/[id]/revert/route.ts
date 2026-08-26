@@ -3,7 +3,12 @@ import { assertClinicScope } from "@/lib/auth/clinic-scope";
 import { assertSectionOwnership } from "@/lib/auth/section-ownership";
 import { ApiError, toErrorResponse } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
-import { AuditAction, EntryAuthorRole, EntryType } from "@/generated/prisma/client";
+import {
+  AuditAction,
+  EntryAuthorRole,
+  EntryType,
+  ProvenanceType,
+} from "@/generated/prisma/client";
 
 // Nightingale Write Invariant (same invariant PUT follows — see
 // src/app/api/timeline/[id]/route.ts):
@@ -193,6 +198,22 @@ export async function POST(
           },
         });
 
+        // Visible system_event counterpart to note_reverted above — every
+        // successful revert leaves a human-readable timeline entry, not
+        // just an audit record. Same transaction as the rest of this write.
+        await tx.timelineEntry.create({
+          data: {
+            patientId: entry.patientId,
+            authorRole: EntryAuthorRole.system,
+            authorId: null,
+            type: EntryType.system_event,
+            content: `Entry reverted to version ${targetVersion} by ${user.id}`,
+            sectionKey: null,
+            provenanceType: ProvenanceType.none,
+            provenanceId: null,
+          },
+        });
+
         // STEP 4: Clinician correction — extra conflict_flagged in same
         // transaction. Unlike note_reverted above, this keeps PUT's existing
         // convention: versionId points to what got overridden (the archived
@@ -207,6 +228,23 @@ export async function POST(
               timelineEntryId: id,
               versionId: archivedSnapshot.id,
               action: AuditAction.conflict_flagged,
+            },
+          });
+
+          // Second, separate system_event for the override itself — this is
+          // a distinct fact from the revert-event above ("this entry was
+          // reverted" vs. "the revert overrode AI/patient content"), so a
+          // Clinician-override revert produces two system_event entries.
+          await tx.timelineEntry.create({
+            data: {
+              patientId: entry.patientId,
+              authorRole: EntryAuthorRole.system,
+              authorId: null,
+              type: EntryType.system_event,
+              content: "Conflict flagged for clinician review",
+              sectionKey: null,
+              provenanceType: ProvenanceType.none,
+              provenanceId: null,
             },
           });
         }
