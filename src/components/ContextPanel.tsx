@@ -44,9 +44,13 @@ interface Highlight {
   entryContent: string;
   entryProvenanceType: string;
   entryProvenanceId: string | null;
+  riskFloor: "critical" | "unrated";
   acceptedCount: number;
   rejectedCount: number;
   feedbackCount: number;
+  reviewCount: number;
+  acceptanceRate: number | null;
+  learningStatus: "no_feedback" | "gathering_feedback" | "adaptive";
   learnedAdjustment: number;
   effectiveImportance: number;
 }
@@ -109,6 +113,49 @@ function exactQuoteStatus(h: Highlight): string {
   if (!h.quotedTextFound) return "Exact quote not found in current entry";
   if (h.occurrenceCount > 1) return `Exact quote found · ${h.occurrenceCount} occurrences`;
   return "Exact quote found";
+}
+
+// ─── Adaptive-priority presentation (v2) ────────────────────────────────
+// Wording boundary: "adaptive priority" reflects accumulated clinician
+// accept/reject feedback on a recurring risk-reason pattern in this clinic.
+// It is never described as AI learning, clinical confidence, verification,
+// or a change in clinical risk. riskFloor is shown separately and is
+// authoritative.
+function learningStatusLabel(status: Highlight["learningStatus"]): string {
+  if (status === "adaptive") return "Adaptive";
+  if (status === "gathering_feedback") return "Gathering feedback";
+  return "No feedback";
+}
+
+function adaptivePriorityText(h: Highlight): string {
+  if (h.learnedAdjustment > 0) return `${h.effectiveImportance} ↑`;
+  if (h.learnedAdjustment < 0) return `${h.effectiveImportance} ↓`;
+  return `${h.effectiveImportance}`;
+}
+
+function adjustmentText(adjustment: number): string {
+  if (adjustment > 0) return `+${adjustment}`;
+  return `${adjustment}`;
+}
+
+function feedbackEvidenceText(h: Highlight): string {
+  if (h.reviewCount === 0) return "No clinician reviews yet";
+  const reviews = `${h.reviewCount} clinician review${h.reviewCount === 1 ? "" : "s"}`;
+  if (h.acceptanceRate === null) return reviews;
+  return `${reviews} · ${Math.round(h.acceptanceRate * 100)}% accepted`;
+}
+
+function adaptiveExplanation(h: Highlight): string {
+  if (h.learnedAdjustment > 0) {
+    return "Priority increased based on recurring clinician feedback in this clinic.";
+  }
+  if (h.learnedAdjustment < 0) {
+    return "Priority decreased based on recurring clinician feedback in this clinic.";
+  }
+  if (h.learningStatus === "gathering_feedback") {
+    return "Minimum 3 reviewed examples required before adaptive adjustment.";
+  }
+  return "No clinician feedback recorded for this recurring pattern yet.";
 }
 
 // Route-confirmed section ownership (src/lib/auth/section-ownership.ts).
@@ -540,15 +587,23 @@ function ContextPanelDetail({
               <li key={h.id} className={styles.highlightItem}>
                 <p className={styles.quote}>&ldquo;{h.quotedText}&rdquo;</p>
                 <p className={styles.reason}>{h.riskReason}</p>
-                <p className={styles.meta}>Importance: {h.importance}</p>
-                <p className={styles.meta}>Adaptive priority: {h.effectiveImportance}</p>
-                <p className={styles.meta}>
-                  {h.feedbackCount >= 3
-                    ? `${h.acceptedCount} accepted · ${h.rejectedCount} rejected in this clinic`
-                    : `${h.feedbackCount} prior review${
-                        h.feedbackCount === 1 ? "" : "s"
-                      } · threshold not reached`}
-                </p>
+
+                <dl className={styles.adaptiveList}>
+                  <dt>Safety floor</dt>
+                  <dd>{capitalize(h.riskFloor)}</dd>
+                  <dt>Base importance</dt>
+                  <dd>{h.importance}</dd>
+                  <dt>Adaptive priority</dt>
+                  <dd>{adaptivePriorityText(h)}</dd>
+                  <dt>Learning status</dt>
+                  <dd>{learningStatusLabel(h.learningStatus)}</dd>
+                  <dt>Feedback evidence</dt>
+                  <dd>{feedbackEvidenceText(h)}</dd>
+                  <dt>Adjustment</dt>
+                  <dd>{adjustmentText(h.learnedAdjustment)}</dd>
+                </dl>
+                <p className={styles.adaptiveNote}>{adaptiveExplanation(h)}</p>
+
                 <div className={styles.feedbackLine}>
                   <span className={styles.meta}>Feedback: {capitalize(h.feedback)}</span>
                   {identity.role === "Clinician" && (

@@ -161,6 +161,9 @@ export async function GET(
         acceptedCount: adaptive.acceptedCount,
         rejectedCount: adaptive.rejectedCount,
         feedbackCount: adaptive.feedbackCount,
+        reviewCount: adaptive.reviewCount,
+        acceptanceRate: adaptive.acceptanceRate,
+        learningStatus: adaptive.learningStatus,
         learnedAdjustment: adaptive.learnedAdjustment,
         effectiveImportance: adaptive.effectiveImportance,
       };

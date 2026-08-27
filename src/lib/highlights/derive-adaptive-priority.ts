@@ -62,11 +62,29 @@ export interface AdaptivePriorityInput {
   rejectedCount: number;
 }
 
+/**
+ * Descriptive learning state for a Highlight's recurring pattern. Purely a
+ * function of how many non-pending clinician reviews the pattern has:
+ *   - `no_feedback`        — 0 reviews
+ *   - `gathering_feedback` — 1..(threshold-1) reviews, no adjustment yet
+ *   - `adaptive`           — >= threshold reviews, adjustment applies
+ */
+export type LearningStatus = "no_feedback" | "gathering_feedback" | "adaptive";
+
 export interface AdaptivePriority {
   acceptedCount: number;
   rejectedCount: number;
   /** acceptedCount + rejectedCount. `pending` never contributes. */
   feedbackCount: number;
+  /** Alias of feedbackCount — the number of non-pending clinician reviews. */
+  reviewCount: number;
+  /**
+   * acceptedCount / reviewCount, or `null` when reviewCount === 0.
+   * Descriptive only — this is an acceptance rate, NOT a confidence,
+   * accuracy, or clinical-probability measure.
+   */
+  acceptanceRate: number | null;
+  learningStatus: LearningStatus;
   /**
    * 0 while feedbackCount < ADAPTIVE_FEEDBACK_THRESHOLD; otherwise
    * clamp(acceptedCount - rejectedCount, -CLAMP, +CLAMP).
@@ -95,10 +113,20 @@ export function deriveAdaptivePriority(
           ADAPTIVE_ADJUSTMENT_CLAMP,
         );
 
+  const learningStatus: LearningStatus =
+    feedbackCount === 0
+      ? "no_feedback"
+      : feedbackCount < ADAPTIVE_FEEDBACK_THRESHOLD
+        ? "gathering_feedback"
+        : "adaptive";
+
   return {
     acceptedCount,
     rejectedCount,
     feedbackCount,
+    reviewCount: feedbackCount,
+    acceptanceRate: feedbackCount === 0 ? null : acceptedCount / feedbackCount,
+    learningStatus,
     learnedAdjustment,
     effectiveImportance: baseImportance + learnedAdjustment,
   };

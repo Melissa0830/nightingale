@@ -147,5 +147,67 @@ check("N2. normalization keeps distinct reasons distinct (no semantic merging)",
   );
 });
 
+// ─── v2 Phases 4-6: reviewCount / acceptanceRate / learningStatus ─────────
+
+check("S0. 0/0 -> reviewCount 0, acceptanceRate null, status no_feedback, adj 0", () => {
+  const r = deriveAdaptivePriority({ baseImportance: 0, acceptedCount: 0, rejectedCount: 0 });
+  assert.equal(r.reviewCount, 0);
+  assert.equal(r.acceptanceRate, null);
+  assert.equal(r.learningStatus, "no_feedback");
+  assert.equal(r.learnedAdjustment, 0);
+});
+
+check("S1. 1/0 -> reviewCount 1, status gathering_feedback, adj 0", () => {
+  const r = deriveAdaptivePriority({ baseImportance: 0, acceptedCount: 1, rejectedCount: 0 });
+  assert.equal(r.reviewCount, 1);
+  assert.equal(r.learningStatus, "gathering_feedback");
+  assert.equal(r.acceptanceRate, 1);
+  assert.equal(r.learnedAdjustment, 0);
+});
+
+check("S2. 2/0 -> reviewCount 2, status gathering_feedback, adj 0", () => {
+  const r = deriveAdaptivePriority({ baseImportance: 0, acceptedCount: 2, rejectedCount: 0 });
+  assert.equal(r.reviewCount, 2);
+  assert.equal(r.learningStatus, "gathering_feedback");
+  assert.equal(r.learnedAdjustment, 0);
+});
+
+check("S3. 3/0 -> reviewCount 3, acceptanceRate 1, status adaptive, adj +2", () => {
+  const r = deriveAdaptivePriority({ baseImportance: 0, acceptedCount: 3, rejectedCount: 0 });
+  assert.equal(r.reviewCount, 3);
+  assert.equal(r.acceptanceRate, 1);
+  assert.equal(r.learningStatus, "adaptive");
+  assert.equal(r.learnedAdjustment, 2);
+});
+
+check("S4. 2/1 -> acceptanceRate 2/3, status adaptive, adj +1", () => {
+  const r = deriveAdaptivePriority({ baseImportance: 0, acceptedCount: 2, rejectedCount: 1 });
+  assert.equal(r.acceptanceRate, 2 / 3);
+  assert.equal(r.learningStatus, "adaptive");
+  assert.equal(r.learnedAdjustment, 1);
+});
+
+check("S5. 1/2 -> acceptanceRate 1/3, status adaptive, adj -1", () => {
+  const r = deriveAdaptivePriority({ baseImportance: 0, acceptedCount: 1, rejectedCount: 2 });
+  assert.equal(r.acceptanceRate, 1 / 3);
+  assert.equal(r.learningStatus, "adaptive");
+  assert.equal(r.learnedAdjustment, -1);
+});
+
+check("S6. 0/3 -> acceptanceRate 0, status adaptive, adj -2", () => {
+  const r = deriveAdaptivePriority({ baseImportance: 0, acceptedCount: 0, rejectedCount: 3 });
+  assert.equal(r.acceptanceRate, 0);
+  assert.equal(r.learningStatus, "adaptive");
+  assert.equal(r.learnedAdjustment, -2);
+});
+
+check("S7. base importance unchanged by the evidence fields (base 5, 3/0 -> eff 7)", () => {
+  const input = { baseImportance: 5, acceptedCount: 3, rejectedCount: 0 };
+  const r = deriveAdaptivePriority(input);
+  assert.equal(input.baseImportance, 5);
+  assert.equal(r.effectiveImportance, 7);
+  assert.equal(r.reviewCount, 3);
+});
+
 console.log(`\n${passed}/${passed + failed} passed`);
 process.exit(failed === 0 ? 0 : 1);
