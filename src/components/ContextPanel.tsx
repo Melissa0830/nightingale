@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { getToken } from "@/lib/auth-client";
+import { useAuthIdentity } from "./AppShell";
 import CommentsSection from "./CommentsSection";
+import VersionHistory from "./VersionHistory";
 import styles from "./ContextPanel.module.css";
 
 // Mirrors GET /api/timeline/:id exactly (re-confirmed against the
@@ -101,6 +103,23 @@ function exactQuoteStatus(h: Highlight): string {
   return "Exact quote found";
 }
 
+// Route-confirmed section ownership (src/lib/auth/section-ownership.ts).
+// Mirrored here for control visibility only — the backend remains
+// authoritative and re-checks on every PUT/revert. Fail closed: unknown
+// or null sectionKey → no owner → no edit/revert controls.
+const SECTION_OWNER: Readonly<Record<string, "Staff" | "Clinician">> = {
+  staff_note: "Staff",
+  plan: "Clinician",
+  summary: "Clinician",
+  medication: "Clinician",
+};
+
+function roleCanEditSection(role: string, sectionKey: string | null): boolean {
+  if (!sectionKey) return false;
+  const owner = SECTION_OWNER[sectionKey];
+  return owner !== undefined && role === owner;
+}
+
 // Top-level component only decides idle-vs-selected. The actual fetching
 // component below is keyed by entryId, so selecting a different entry
 // (or deselecting then reselecting) always mounts a fresh instance with
@@ -109,9 +128,13 @@ function exactQuoteStatus(h: Highlight): string {
 export default function ContextPanel({
   patientId,
   entryId,
+  onEntryMutated,
 }: {
   patientId: string;
   entryId: string | null;
+  // Called after a successful edit/revert so the parent can refresh the
+  // Timeline (which fetches its own list). No global event bus.
+  onEntryMutated: () => void;
 }) {
   if (!entryId) {
     return (
@@ -121,16 +144,26 @@ export default function ContextPanel({
       </aside>
     );
   }
-  return <ContextPanelDetail key={entryId} patientId={patientId} entryId={entryId} />;
+  return (
+    <ContextPanelDetail
+      key={entryId}
+      patientId={patientId}
+      entryId={entryId}
+      onEntryMutated={onEntryMutated}
+    />
+  );
 }
 
 function ContextPanelDetail({
   patientId,
   entryId,
+  onEntryMutated,
 }: {
   patientId: string;
   entryId: string;
+  onEntryMutated: () => void;
 }) {
+  const identity = useAuthIdentity();
   const [entryStatus, setEntryStatus] = useState<EntryStatus>(() =>
     getToken() ? "loading" : "error",
   );
@@ -139,6 +172,22 @@ function ContextPanelDetail({
     getToken() ? "loading" : "error",
   );
   const [highlights, setHighlights] = useState<Highlight[]>([]);
+
+  // Local refetch trigger. Bumped after a successful edit/revert so the
+  // selected entry, its highlights, and the Version History list all
+  // refresh — the smallest mechanism, scoped to this panel.
+  const [localRefresh, setLocalRefresh] = useState(0);
+
+  // Edit buffer state — kept local to this panel (or lifted no higher).
+  // selectedEntryId stays owned by PatientDetailContent.
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  // The versionNumber captured when edit mode was entered. Sent verbatim as
+  // expectedVersion on Save — never refreshed just before the request, so a
+  // stale write is genuinely detectable as a 409.
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [conflict, setConflict] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -191,7 +240,80 @@ function ContextPanelDetail({
     return () => {
       cancelled = true;
     };
-  }, [entryId, patientId]);
+  }, [entryId, patientId, localRefresh]);
+
+  // All handlers below run only from user events, never an effect body.
+  function startEdit(current: EntryDetail) {
+    setDraft(current.content);
+    setLoadedVersion(current.versionNumber);
+    setConflict(false);
+    setSaveState("idle");
+    setIsEditing(true);
+  }
+
+  function cancelEdit() {
+    setIsEditing(false);
+    setDraft("");
+    setConflict(false);
+    setSaveState("idle");
+  }
+
+  async function handleSave() {
+    const token = getToken();
+    if (!token || loadedVersion === null || draft.trim().length === 0) return;
+    setSaveState("saving");
+    setConflict(false);
+    try {
+      const res = await fetch(`/api/timeline/${entryId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ content: draft, expectedVersion: loadedVersion }),
+      });
+      if (res.status === 409) {
+        // Stale write. The backend rejected it — nothing was merged, nothing
+        // overwritten. Keep the draft and the stale loadedVersion; stay in
+        // edit mode; wait for an explicit Reload latest.
+        setConflict(true);
+        setSaveState("idle");
+        return;
+      }
+      if (!res.ok) {
+        setSaveState("error");
+        return;
+      }
+      setIsEditing(false);
+      setDraft("");
+      setSaveState("idle");
+      setLocalRefresh((n) => n + 1);
+      onEntryMutated();
+    } catch {
+      setSaveState("error");
+    }
+  }
+
+  async function handleReloadLatest() {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/timeline/${entryId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        setSaveState("error");
+        return;
+      }
+      const fresh = (await res.json()) as EntryDetail;
+      setEntry(fresh);
+      setDraft(fresh.content);
+      setLoadedVersion(fresh.versionNumber);
+      setConflict(false);
+      setSaveState("idle");
+      // Refresh highlights + Version History against the now-current entry.
+      setLocalRefresh((n) => n + 1);
+    } catch {
+      setSaveState("error");
+    }
+  }
 
   if (entryStatus === "loading") {
     return (
@@ -232,6 +354,26 @@ function ContextPanelDetail({
   const section = sectionLabel(entry.sectionKey);
   const hasProvenance = entry.provenanceType !== "none";
 
+  // Control visibility from auth identity + route-confirmed ownership only.
+  // Admin is read-only for clinical sections (PUT/revert both 403 Admin), so
+  // it never gets Edit/Revert — just inspection and history. Patient never
+  // reaches this component at all (see patients/[id]/page.tsx).
+  const canEdit =
+    identity.role !== "Admin" && roleCanEditSection(identity.role, entry.sectionKey);
+
+  // The one reachable Clinician-override case: a Clinician editing an entry
+  // the backend will flag as a conflict (AI-scribed, or Patient/system
+  // authored) that has ALREADY passed section ownership. For entries that
+  // fail ownership first (e.g. sectionKey=null patient summaries) canEdit is
+  // false, so no override wording is shown — matching route reachability.
+  const isOverrideEntry =
+    canEdit &&
+    identity.role === "Clinician" &&
+    (entry.type === "ai_doctor_consult_summary" ||
+      entry.type === "ai_nurse_consult_summary" ||
+      entry.authorRole === "Patient" ||
+      entry.authorRole === "system");
+
   return (
     <aside className={styles.panel} aria-label="Context">
       <h2 className={styles.title}>Context</h2>
@@ -239,7 +381,61 @@ function ContextPanelDetail({
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Content</h3>
-        <p className={styles.content}>{entry.content}</p>
+        {!isEditing && <p className={styles.content}>{entry.content}</p>}
+        {!isEditing && canEdit && (
+          <button type="button" className={styles.editButton} onClick={() => startEdit(entry)}>
+            Edit
+          </button>
+        )}
+        {isEditing && (
+          <div className={styles.editor}>
+            {isOverrideEntry && (
+              <p className={styles.overrideNotice}>
+                This entry is AI-scribed. Saving your edit replaces the current
+                AI-scribed entry state and records a conflict event for clinician
+                review. It does not mark the AI summary as verified.
+              </p>
+            )}
+            <textarea
+              className={styles.textarea}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={6}
+              aria-label="Edit entry content"
+            />
+            {conflict && (
+              <div className={styles.conflictBanner} role="alert">
+                <p>This entry changed after you opened it.</p>
+                <p>Your draft was not saved.</p>
+                <button
+                  type="button"
+                  className={styles.reloadButton}
+                  onClick={handleReloadLatest}
+                >
+                  Reload latest
+                </button>
+              </div>
+            )}
+            {saveState === "error" && (
+              <p className={styles.error}>
+                Unable to save. Check your connection and try again.
+              </p>
+            )}
+            <div className={styles.editActions}>
+              <button
+                type="button"
+                className={styles.saveButton}
+                disabled={saveState === "saving" || draft.trim().length === 0}
+                onClick={handleSave}
+              >
+                {saveState === "saving" ? "Saving…" : "Save"}
+              </button>
+              <button type="button" className={styles.cancelButton} onClick={cancelEdit}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className={styles.section}>
@@ -310,6 +506,17 @@ function ContextPanelDetail({
       </section>
 
       <CommentsSection entryId={entryId} />
+
+      <VersionHistory
+        entryId={entryId}
+        canRevert={canEdit}
+        isOverrideEntry={isOverrideEntry}
+        refreshKey={localRefresh}
+        onReverted={() => {
+          setLocalRefresh((n) => n + 1);
+          onEntryMutated();
+        }}
+      />
     </aside>
   );
 }

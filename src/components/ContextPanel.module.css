@@ -102,3 +102,143 @@
 .highlightItem .meta {
   margin-top: 2px;
 }
+
+.editButton {
+  margin-top: var(--space-2);
+  font-size: 12px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.editButton:hover {
+  background: var(--color-bg);
+}
+
+.editButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.editor {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.textarea {
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  resize: vertical;
+  min-height: 120px;
+}
+
+.textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.editActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.saveButton {
+  font-size: 13px;
+  font-weight: 500;
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.saveButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.saveButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.cancelButton {
+  font-size: 13px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.cancelButton:hover {
+  background: var(--color-bg);
+}
+
+.cancelButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.conflictBanner {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.conflictBanner p {
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+.reloadButton {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  font-size: 12px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.reloadButton:hover {
+  background: var(--color-bg);
+}
+
+.reloadButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.overrideNotice {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.error {
+  font-size: 12px;
+  color: var(--color-danger);
+}

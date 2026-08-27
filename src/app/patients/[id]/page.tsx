@@ -35,6 +35,10 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
   const [status, setStatus] = useState<Status>("loading");
   const [patient, setPatient] = useState<PatientSummary | null>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  // Minimal cross-component refresh signal: bumped when ContextPanel reports a
+  // successful timeline-entry edit/revert, so the self-fetching Timeline
+  // refetches. Not app-wide state — owned here, passed only to Timeline.
+  const [timelineRevision, setTimelineRevision] = useState(0);
 
   useEffect(() => {
     const token = getToken();
@@ -114,8 +118,13 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
             patientId={patientId}
             selectedEntryId={selectedEntryId}
             onSelectEntry={setSelectedEntryId}
+            refreshSignal={timelineRevision}
           />
-          <ContextPanel patientId={patientId} entryId={selectedEntryId} />
+          <ContextPanel
+            patientId={patientId}
+            entryId={selectedEntryId}
+            onEntryMutated={() => setTimelineRevision((n) => n + 1)}
+          />
         </div>
       ) : (
         <Timeline

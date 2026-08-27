@@ -79,9 +79,18 @@ interface TimelineProps {
   patientId: string;
   selectedEntryId: string | null;
   onSelectEntry: (id: string | null) => void;
+  // Bumped by PatientDetailContent after a successful edit/revert in the
+  // ContextPanel so this self-fetching list refetches. Optional: the Patient
+  // view never mutates, so it omits this.
+  refreshSignal?: number;
 }
 
-export default function Timeline({ patientId, selectedEntryId, onSelectEntry }: TimelineProps) {
+export default function Timeline({
+  patientId,
+  selectedEntryId,
+  onSelectEntry,
+  refreshSignal,
+}: TimelineProps) {
   const identity = useAuthIdentity();
   const isPatient = identity.role === "Patient";
   const [status, setStatus] = useState<Status>(() => (getToken() ? "loading" : "error"));
@@ -110,7 +119,7 @@ export default function Timeline({ patientId, selectedEntryId, onSelectEntry }: 
     return () => {
       cancelled = true;
     };
-  }, [patientId]);
+  }, [patientId, refreshSignal]);
 
   const heading = isPatient ? "Your Timeline" : "Longitudinal Timeline";
 
