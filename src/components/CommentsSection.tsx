@@ -346,34 +346,59 @@ export default function CommentsSection({
             rows={3}
           />
 
-          <div className={styles.composerRow}>
-            <label htmlFor="mention-select" className={styles.assignLabel}>
-              Mention
-            </label>
-            {collabStatus === "error" ? (
-              <span className={styles.state}>Collaborator list unavailable.</span>
-            ) : (
+          <div className={styles.composerControls}>
+            <div className={styles.composerField}>
+              <label htmlFor="mention-select" className={styles.assignLabel}>
+                Mention
+              </label>
+              {collabStatus === "error" ? (
+                <span className={styles.state}>Collaborator list unavailable.</span>
+              ) : (
+                <select
+                  id="mention-select"
+                  className={styles.select}
+                  value=""
+                  disabled={
+                    collabStatus !== "ok" || unselectedCollaborators.length === 0
+                  }
+                  onChange={(e) => {
+                    addDraftMention(e.target.value);
+                    e.currentTarget.selectedIndex = 0;
+                  }}
+                >
+                  <option value="">
+                    {collabStatus === "loading" ? "Loading…" : "Add person…"}
+                  </option>
+                  {unselectedCollaborators.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} · {c.role}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className={styles.composerField}>
+              <label htmlFor="assign-select" className={styles.assignLabel}>
+                Assign to
+              </label>
               <select
-                id="mention-select"
+                id="assign-select"
                 className={styles.select}
-                value=""
-                disabled={collabStatus !== "ok" || unselectedCollaborators.length === 0}
-                onChange={(e) => {
-                  addDraftMention(e.target.value);
-                  e.currentTarget.selectedIndex = 0;
-                }}
+                value={draftAssignee}
+                disabled={collabStatus !== "ok"}
+                onChange={(e) => setDraftAssignee(e.target.value)}
               >
-                <option value="">
-                  {collabStatus === "loading" ? "Loading…" : "Add person…"}
-                </option>
-                {unselectedCollaborators.map((c) => (
+                <option value="">Unassigned</option>
+                {collaborators.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} · {c.role}
                   </option>
                 ))}
               </select>
-            )}
+            </div>
           </div>
+
           {draftMentions.length > 0 && (
             <ul className={styles.chipRow}>
               {draftMentions.map((id) => (
@@ -391,26 +416,6 @@ export default function CommentsSection({
               ))}
             </ul>
           )}
-
-          <div className={styles.composerRow}>
-            <label htmlFor="assign-select" className={styles.assignLabel}>
-              Assign to
-            </label>
-            <select
-              id="assign-select"
-              className={styles.select}
-              value={draftAssignee}
-              disabled={collabStatus !== "ok"}
-              onChange={(e) => setDraftAssignee(e.target.value)}
-            >
-              <option value="">Unassigned</option>
-              {collaborators.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} · {c.role}
-                </option>
-              ))}
-            </select>
-          </div>
 
           <button
             type="submit"
