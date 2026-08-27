@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getToken } from "@/lib/auth-client";
+import CommentsSection from "./CommentsSection";
 import styles from "./ContextPanel.module.css";
 
 // Mirrors GET /api/timeline/:id exactly (re-confirmed against the
@@ -307,6 +308,8 @@ function ContextPanelDetail({
           </ul>
         )}
       </section>
+
+      <CommentsSection entryId={entryId} />
     </aside>
   );
 }
