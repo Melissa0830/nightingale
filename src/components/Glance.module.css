@@ -37,6 +37,12 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.blockSubtitle {
+  font-size: 11px;
+  color: var(--color-text-muted);
   margin-bottom: var(--space-2);
 }
 

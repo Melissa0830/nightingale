@@ -69,7 +69,22 @@ function describeEntry(entry: RecentChange): string {
   return "Entry updated";
 }
 
-export default function Glance({ patientId }: { patientId: string }) {
+export default function Glance({
+  patientId,
+  // Monotonic integer owned by the patient workspace. It is bumped ONLY
+  // after a server-confirmed mutation that changes Glance-derived data
+  // (an unresolved comment created / resolved / reopened, or a Timeline
+  // entry edited / reverted). Each bump re-runs the fetch effect below;
+  // the previous run's cleanup sets its own `cancelled` flag first, so an
+  // older in-flight response can never overwrite a newer one — this covers
+  // both patient-switch and same-patient overlapping-refresh races without
+  // an AbortController. Assignment-only, mention, Highlight-feedback, and
+  // every read-only action never touch this key.
+  refreshKey = 0,
+}: {
+  patientId: string;
+  refreshKey?: number;
+}) {
   // Lazy initializer, not a setState-in-effect: if there's no token at
   // mount, status starts (and stays) "error" without the effect ever
   // needing to set it. In practice Glance only renders inside AppShell,
@@ -108,7 +123,9 @@ export default function Glance({ patientId }: { patientId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [patientId]);
+    // patientId + refreshKey are both primitives — no unstable object/
+    // callback in the dependency list, so this cannot loop.
+  }, [patientId, refreshKey]);
 
   if (status === "loading") {
     return (
@@ -163,6 +180,7 @@ export default function Glance({ patientId }: { patientId: string }) {
           <h3 className={styles.blockTitle}>
             Open Actions{data.openActions.length > 0 ? ` · ${data.openActions.length}` : ""}
           </h3>
+          <p className={styles.blockSubtitle}>Unresolved comments</p>
           {data.openActions.length === 0 ? (
             <p className={styles.empty}>No open actions.</p>
           ) : (
@@ -181,6 +199,7 @@ export default function Glance({ patientId }: { patientId: string }) {
 
         <div className={styles.block}>
           <h3 className={styles.blockTitle}>Recent Changes</h3>
+          <p className={styles.blockSubtitle}>By last edit time</p>
           {recentChanges.length === 0 ? (
             <p className={styles.empty}>No recent changes.</p>
           ) : (

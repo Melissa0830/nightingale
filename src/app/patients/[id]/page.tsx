@@ -43,6 +43,15 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
   // "Jump to source"). Timeline scrolls the matching row into view on every
   // bump — even when the entry id is unchanged, so re-jumping still moves.
   const [revealNonce, setRevealNonce] = useState(0);
+  // Monotonic key handed to Glance. Bumped ONLY on a server-confirmed
+  // mutation that actually changes Glance-derived data: an unresolved
+  // comment created / resolved / reopened (openActions), or a Timeline
+  // entry edited / reverted (recentChanges via updatedAt). Assignment-only
+  // comment PATCHes, mentions, Highlight Accept/Reject, and every
+  // read-only action deliberately do NOT bump it — none of them change
+  // what /api/patients/:id/glance returns for the panel.
+  const [glanceRefreshKey, setGlanceRefreshKey] = useState(0);
+  const bumpGlance = () => setGlanceRefreshKey((k) => k + 1);
 
   useEffect(() => {
     const token = getToken();
@@ -115,7 +124,9 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
   return (
     <div>
       <PatientHeader patient={patient} />
-      {identity.role !== "Patient" && <Glance patientId={patientId} />}
+      {identity.role !== "Patient" && (
+        <Glance patientId={patientId} refreshKey={glanceRefreshKey} />
+      )}
       {identity.role !== "Patient" ? (
         <div className={styles.workspace}>
           <Timeline
@@ -128,7 +139,14 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
           <ContextPanel
             patientId={patientId}
             entryId={selectedEntryId}
-            onEntryMutated={() => setTimelineRevision((n) => n + 1)}
+            onEntryMutated={() => {
+              // A Timeline entry changed (edit / revert / conflict
+              // override): refresh the Timeline list AND Glance Recent
+              // Changes (the entry's updatedAt moved).
+              setTimelineRevision((n) => n + 1);
+              bumpGlance();
+            }}
+            onGlanceRelevantMutation={bumpGlance}
             onSelectEntry={(id) => {
               setSelectedEntryId(id);
               setRevealNonce((n) => n + 1);

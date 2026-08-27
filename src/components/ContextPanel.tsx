@@ -206,6 +206,7 @@ export default function ContextPanel({
   patientId,
   entryId,
   onEntryMutated,
+  onGlanceRelevantMutation,
   onSelectEntry,
 }: {
   patientId: string;
@@ -213,6 +214,10 @@ export default function ContextPanel({
   // Called after a successful edit/revert so the parent can refresh the
   // Timeline (which fetches its own list). No global event bus.
   onEntryMutated: () => void;
+  // Called after a successful mutation that changes Glance-derived data
+  // but NOT the Timeline — currently only comment create / resolve /
+  // reopen (openActions). Narrow refresh notification, nothing more.
+  onGlanceRelevantMutation?: () => void;
   // Provenance "Jump to source": ask the parent to select (and reveal) a
   // linked source Timeline entry. Read-only navigation only.
   onSelectEntry?: (id: string) => void;
@@ -231,6 +236,7 @@ export default function ContextPanel({
       patientId={patientId}
       entryId={entryId}
       onEntryMutated={onEntryMutated}
+      onGlanceRelevantMutation={onGlanceRelevantMutation}
       onSelectEntry={onSelectEntry}
     />
   );
@@ -240,11 +246,13 @@ function ContextPanelDetail({
   patientId,
   entryId,
   onEntryMutated,
+  onGlanceRelevantMutation,
   onSelectEntry,
 }: {
   patientId: string;
   entryId: string;
   onEntryMutated: () => void;
+  onGlanceRelevantMutation?: () => void;
   onSelectEntry?: (id: string) => void;
 }) {
   const identity = useAuthIdentity();
@@ -775,7 +783,10 @@ function ContextPanelDetail({
         )}
       </section>
 
-      <CommentsSection entryId={entryId} />
+      <CommentsSection
+        entryId={entryId}
+        onOpenActionsChanged={onGlanceRelevantMutation}
+      />
 
       <VersionHistory
         entryId={entryId}

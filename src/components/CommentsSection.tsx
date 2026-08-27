@@ -40,7 +40,19 @@ function formatDateTime(iso: string): string {
   return `${day} · ${time}`;
 }
 
-export default function CommentsSection({ entryId }: { entryId: string }) {
+export default function CommentsSection({
+  entryId,
+  // Called after a server-confirmed change to the set of UNRESOLVED
+  // comments on this patient — a new unresolved comment, a resolve, or a
+  // reopen. That is the only comment mutation that moves Glance's Open
+  // Actions count. Assignment / reassignment / clearing an assignee and
+  // mention selection all leave the unresolved-comment set unchanged, so
+  // they never call this.
+  onOpenActionsChanged,
+}: {
+  entryId: string;
+  onOpenActionsChanged?: () => void;
+}) {
   const identity = useAuthIdentity();
   // Confirmed from the actual routes: POST and PATCH both reject Patient
   // AND Admin (403) — only Staff/Clinician may mutate. Admin therefore
@@ -179,6 +191,8 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
       setDraftMentions([]);
       setDraftAssignee("");
       await refetchComments();
+      // A new comment is always created unresolved -> Open Actions +1.
+      onOpenActionsChanged?.();
     } catch {
       setSubmitError("Unable to add comment.");
     } finally {
@@ -206,6 +220,11 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
         return;
       }
       await refetchComments();
+      // Only a resolve / reopen changes the unresolved-comment set that
+      // Glance's Open Actions counts. An assignment-only PATCH does not.
+      if ("resolved" in body) {
+        onOpenActionsChanged?.();
+      }
     } catch {
       setMutateError("Unable to update comment.");
     } finally {
