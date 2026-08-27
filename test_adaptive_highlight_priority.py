@@ -287,6 +287,24 @@ def run_tests():
         and z_d.get("matchMethod") == "exact"
         and z_d.get("learnedAdjustment") == -2,
     )
+
+    # Safety-first ordering: the deterministic critical Highlight (adj 0) must
+    # appear BEFORE every unrated Highlight, including the +2 bucket-X ones.
+    ids_in_order = [h["id"] for h in rows_a]
+    crit_id = "synthetic-highlight-learning-critical"
+    crit = find(rows_a, crit_id)
+    first_unrated_idx = next(
+        (i for i, h in enumerate(rows_a) if h.get("riskFloor") == "unrated"), None
+    )
+    check(
+        "L6. critical riskFloor Highlight (adj 0) sorts before every unrated "
+        "Highlight, including bucket X at effectiveImportance +2",
+        crit is not None
+        and crit.get("riskFloor") == "critical"
+        and crit.get("learnedAdjustment") == 0
+        and ids_in_order.index(crit_id)
+        < (first_unrated_idx if first_unrated_idx is not None else 10**9),
+    )
     # Clinic B: the lexical demo highlight does not exist there; its bucket X
     # target stays -2 and cannot be pulled toward Clinic A's +2 evidence.
     s_b, rows_b = get_highlights("clinician_b", PATIENT_LEARNING_B)

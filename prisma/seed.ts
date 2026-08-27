@@ -51,6 +51,9 @@ const HL_LEARN_X_LEX_ID = "synthetic-highlight-learning-x-lex"; // pending — L
 const HL_LEARN_Y_E_ID = "synthetic-highlight-learning-y-e"; // accepted
 const HL_LEARN_Y_F_ID = "synthetic-highlight-learning-y-f"; // accepted
 const HL_LEARN_Y_G_ID = "synthetic-highlight-learning-y-g"; // pending — GATHERING demo target (0)
+// Deterministic critical riskFloor, no recurring pattern, adjustment 0 — proves
+// a critical Highlight sorts before every unrated one regardless of adaptive score.
+const HL_LEARN_CRITICAL_ID = "synthetic-highlight-learning-critical";
 // Bucket Z (Clinic A) — "imaging finding likely incidental; no action needed". 3 rejected.
 const HL_LEARN_Z_1_ID = "synthetic-highlight-learning-z-1"; // rejected
 const HL_LEARN_Z_2_ID = "synthetic-highlight-learning-z-2"; // rejected
@@ -564,6 +567,9 @@ async function main() {
     { id: HL_LEARN_Z_2_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_RISKFLAG_ID, quotedText: "Minor calcification, unchanged", riskReason: RISK_REASON_Z_LOWER, feedback: "rejected" as const },
     { id: HL_LEARN_Z_3_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_RISKFLAG_ID, quotedText: "Trace effusion, resolving", riskReason: RISK_REASON_Z_SPACED, feedback: "rejected" as const },
     { id: HL_LEARN_Z_D_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_RISKFLAG_ID, quotedText: "Each judged likely incidental with no action needed", riskReason: RISK_REASON_Z_CANONICAL, feedback: "pending" as const },
+    // Deterministic critical floor ("chest pain"), no recurring pattern -> adj 0.
+    // Must still sort ahead of the +2 unrated bucket-X highlights.
+    { id: HL_LEARN_CRITICAL_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_RISKFLAG_ID, quotedText: "Chest pain on exertion noted this visit", riskReason: "Chest pain reported; escalate per protocol.", feedback: "pending" as const },
     // Bucket X — Clinic B — three rejected, one pending target. Same normalized
     // riskReason as Clinic A bucket X; must never influence Clinic A.
     { id: HL_LEARN_XB_1_ID, patientId: patientLearningB.id, entryId: ENTRY_LEARNING_B_FOLLOWUP_ID, quotedText: "recommended follow-up for persistent symptoms", riskReason: RISK_REASON_X_CANONICAL, feedback: "rejected" as const },
