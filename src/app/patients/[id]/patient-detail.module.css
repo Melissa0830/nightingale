@@ -2,15 +2,3 @@
   font-size: 14px;
   color: var(--color-text-muted);
 }
-
-.placeholder {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-.placeholderSub {
-  margin-top: var(--space-1);
-  font-size: 13px;
-  color: var(--color-text-muted);
-}

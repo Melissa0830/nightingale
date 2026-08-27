@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppShell, { useAuthIdentity } from "@/components/AppShell";
 import PatientHeader, { type PatientSummary } from "@/components/PatientHeader";
 import Glance from "@/components/Glance";
+import Timeline from "@/components/Timeline";
 import { getToken, clearToken } from "@/lib/auth-client";
 import styles from "./patient-detail.module.css";
 
@@ -91,26 +92,18 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
     return <p className={styles.state}>Something went wrong loading this patient.</p>;
   }
 
-  // Glance is fetched only for non-Patient roles, and replaces the Block 2
-  // placeholder for them entirely. Patient never sees it — matching the
-  // server's own 403 for that role on this route (see
+  // Glance is fetched only for non-Patient roles. Patient never sees it —
+  // matching the server's own 403 for that role on this route (see
   // src/app/api/patients/[id]/glance/route.ts) — so no fetch is even
-  // attempted here rather than fetching and hiding the result; Patient
-  // keeps the placeholder until a Patient-safe view arrives in a later
-  // block.
+  // attempted here rather than fetching and hiding the result. Timeline
+  // is the same component for every role — it reads identity internally
+  // and presents itself accordingly (heading, empty-state wording, and
+  // omitting versionNumber/provenance metadata for Patient rows).
   return (
     <div>
       <PatientHeader patient={patient} />
-      {identity.role !== "Patient" ? (
-        <Glance patientId={patientId} />
-      ) : (
-        <>
-          <p className={styles.placeholder}>Patient workspace</p>
-          <p className={styles.placeholderSub}>
-            More clinical context will appear in later blocks.
-          </p>
-        </>
-      )}
+      {identity.role !== "Patient" && <Glance patientId={patientId} />}
+      <Timeline patientId={patientId} />
     </div>
   );
 }
