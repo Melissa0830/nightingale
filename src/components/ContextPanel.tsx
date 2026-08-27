@@ -205,12 +205,16 @@ function roleCanEditSection(role: string, sectionKey: string | null): boolean {
 export default function ContextPanel({
   patientId,
   entryId,
+  onClose,
   onEntryMutated,
   onGlanceRelevantMutation,
   onSelectEntry,
 }: {
   patientId: string;
   entryId: string | null;
+  // Explicit deselection from the panel's own Close control. Purely a UI
+  // state change in the parent (selectedEntryId -> null); mutates nothing.
+  onClose?: () => void;
   // Called after a successful edit/revert so the parent can refresh the
   // Timeline (which fetches its own list). No global event bus.
   onEntryMutated: () => void;
@@ -225,7 +229,14 @@ export default function ContextPanel({
   if (!entryId) {
     return (
       <aside className={styles.panel} aria-label="Context">
-        <h2 className={styles.title}>Context</h2>
+        <div className={styles.panelHead}>
+          <h2 className={styles.title}>Context</h2>
+          {onClose && (
+            <button type="button" className={styles.closeButton} aria-label="Close context panel" onClick={onClose}>
+              Close
+            </button>
+          )}
+        </div>
         <p className={styles.state}>Select a timeline entry to inspect its context.</p>
       </aside>
     );
@@ -235,6 +246,7 @@ export default function ContextPanel({
       key={entryId}
       patientId={patientId}
       entryId={entryId}
+      onClose={onClose}
       onEntryMutated={onEntryMutated}
       onGlanceRelevantMutation={onGlanceRelevantMutation}
       onSelectEntry={onSelectEntry}
@@ -245,12 +257,14 @@ export default function ContextPanel({
 function ContextPanelDetail({
   patientId,
   entryId,
+  onClose,
   onEntryMutated,
   onGlanceRelevantMutation,
   onSelectEntry,
 }: {
   patientId: string;
   entryId: string;
+  onClose?: () => void;
   onEntryMutated: () => void;
   onGlanceRelevantMutation?: () => void;
   onSelectEntry?: (id: string) => void;
@@ -492,7 +506,14 @@ function ContextPanelDetail({
   if (entryStatus === "loading") {
     return (
       <aside className={styles.panel} aria-label="Context">
-        <h2 className={styles.title}>Context</h2>
+        <div className={styles.panelHead}>
+          <h2 className={styles.title}>Context</h2>
+          {onClose && (
+            <button type="button" className={styles.closeButton} aria-label="Close context panel" onClick={onClose}>
+              Close
+            </button>
+          )}
+        </div>
         <p className={styles.state} role="status">
           Loading context…
         </p>
@@ -502,7 +523,14 @@ function ContextPanelDetail({
   if (entryStatus === "forbidden") {
     return (
       <aside className={styles.panel} aria-label="Context">
-        <h2 className={styles.title}>Context</h2>
+        <div className={styles.panelHead}>
+          <h2 className={styles.title}>Context</h2>
+          {onClose && (
+            <button type="button" className={styles.closeButton} aria-label="Close context panel" onClick={onClose}>
+              Close
+            </button>
+          )}
+        </div>
         <p className={styles.state}>You do not have access to this entry.</p>
       </aside>
     );
@@ -510,7 +538,14 @@ function ContextPanelDetail({
   if (entryStatus === "notfound") {
     return (
       <aside className={styles.panel} aria-label="Context">
-        <h2 className={styles.title}>Context</h2>
+        <div className={styles.panelHead}>
+          <h2 className={styles.title}>Context</h2>
+          {onClose && (
+            <button type="button" className={styles.closeButton} aria-label="Close context panel" onClick={onClose}>
+              Close
+            </button>
+          )}
+        </div>
         <p className={styles.state}>Entry not found.</p>
       </aside>
     );
@@ -518,7 +553,14 @@ function ContextPanelDetail({
   if (entryStatus === "error" || !entry) {
     return (
       <aside className={styles.panel} aria-label="Context">
-        <h2 className={styles.title}>Context</h2>
+        <div className={styles.panelHead}>
+          <h2 className={styles.title}>Context</h2>
+          {onClose && (
+            <button type="button" className={styles.closeButton} aria-label="Close context panel" onClick={onClose}>
+              Close
+            </button>
+          )}
+        </div>
         <p className={styles.state}>Unable to load entry context.</p>
       </aside>
     );
@@ -550,7 +592,14 @@ function ContextPanelDetail({
 
   return (
     <aside className={styles.panel} aria-label="Context">
-      <h2 className={styles.title}>Context</h2>
+      <div className={styles.panelHead}>
+        <h2 className={styles.title}>Context</h2>
+        {onClose && (
+          <button type="button" className={styles.closeButton} aria-label="Close context panel" onClick={onClose}>
+            Close
+          </button>
+        )}
+      </div>
       <p className={styles.type}>{typeLabel(entry, classification)}</p>
 
       <section className={styles.section}>

@@ -1,13 +1,11 @@
 .timeline {
-  margin-top: var(--space-6);
+  margin-top: var(--space-5);
 }
 
 .title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--color-text-strong);
   margin-bottom: var(--space-3);
 }
 
@@ -21,9 +19,9 @@
 }
 
 .dayHeading {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-text-muted);
   margin-bottom: var(--space-2);
@@ -38,9 +36,9 @@
 .row {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
-  padding: var(--space-2) var(--space-2);
+  padding: var(--space-2);
   border: none;
   border-left: 2px solid transparent;
   border-radius: 4px;
@@ -60,16 +58,34 @@
 
 .rowSelected {
   border-left-color: var(--color-accent);
-  background: var(--color-bg);
+  background: var(--color-selected-bg);
+}
+
+.rowSelected .badge {
+  color: var(--color-text-strong);
 }
 
 .time {
   flex-shrink: 0;
-  width: 52px;
-  padding-top: 2px;
+  width: 46px;
+  padding-top: 1px;
   font-size: 12px;
   color: var(--color-text-muted);
   font-family: var(--font-geist-mono), monospace;
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  box-shadow: 0 0 0 3px var(--color-surface);
+}
+
+.rowSelected .dot {
+  background: var(--color-accent);
 }
 
 .rowBody {
@@ -77,6 +93,14 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
+}
+
+.badgeRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .badge {
@@ -85,6 +109,14 @@
   letter-spacing: 0.02em;
   color: var(--color-text-muted);
   text-transform: uppercase;
+}
+
+.version {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  font-family: var(--font-geist-mono), monospace;
+  opacity: 0.8;
 }
 
 .content {
@@ -102,21 +134,22 @@
 }
 
 /* Restrained per-classification accent — text label already conveys the
-   category; color is a secondary cue only, never the sole signal. */
+   category; color is a secondary cue only, never the sole signal. Tokens
+   are the single source of truth for the clinical colour system. */
 .row_Clinician .badge {
-  color: #1d4ed8;
+  color: var(--role-clinician);
 }
 .row_Staff .badge {
-  color: #0f766e;
+  color: var(--role-staff);
 }
 .row_AIScribe .badge {
-  color: #7c3aed;
+  color: var(--role-ai);
 }
 .row_Patient .badge {
-  color: #b45309;
+  color: var(--role-patient);
 }
 .row_System {
-  background: #f9fafb;
+  background: var(--color-surface-alt);
 }
 .row_System .badge,
 .row_System .content {

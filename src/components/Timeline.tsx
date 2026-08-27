@@ -222,17 +222,22 @@ export default function Timeline({
                     onClick={() => onSelectEntry(selected ? null : entry.id)}
                   >
                     <span className={styles.time}>{timeLabel(entry.createdAt)}</span>
+                    <span className={styles.dot} aria-hidden="true" />
                     <span className={styles.rowBody}>
-                      <span className={styles.badge}>{badgeLabel(entry, classification)}</span>
-                      <span className={styles.content}>{entry.content}</span>
-                      {!isPatient && (
-                        <span className={styles.meta}>
-                          v{entry.versionNumber}
-                          {classification === "AI Scribe" && entry.provenanceType !== "none"
-                            ? ` · Source: ${entry.provenanceType}`
-                            : ""}
+                      <span className={styles.badgeRow}>
+                        <span className={styles.badge}>
+                          {badgeLabel(entry, classification)}
                         </span>
-                      )}
+                        {!isPatient && (
+                          <span className={styles.version}>v{entry.versionNumber}</span>
+                        )}
+                      </span>
+                      <span className={styles.content}>{entry.content}</span>
+                      {!isPatient &&
+                        classification === "AI Scribe" &&
+                        entry.provenanceType !== "none" && (
+                          <span className={styles.meta}>Source: {entry.provenanceType}</span>
+                        )}
                     </span>
                   </button>
                 </li>

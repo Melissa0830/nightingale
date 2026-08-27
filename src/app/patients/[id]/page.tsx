@@ -128,7 +128,11 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
         <Glance patientId={patientId} refreshKey={glanceRefreshKey} />
       )}
       {identity.role !== "Patient" ? (
-        <div className={styles.workspace}>
+        <div
+          className={`${styles.workspace} ${
+            selectedEntryId ? styles.workspaceWithPanel : ""
+          }`}
+        >
           <Timeline
             patientId={patientId}
             selectedEntryId={selectedEntryId}
@@ -136,22 +140,31 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
             refreshSignal={timelineRevision}
             revealSignal={revealNonce}
           />
-          <ContextPanel
-            patientId={patientId}
-            entryId={selectedEntryId}
-            onEntryMutated={() => {
-              // A Timeline entry changed (edit / revert / conflict
-              // override): refresh the Timeline list AND Glance Recent
-              // Changes (the entry's updatedAt moved).
-              setTimelineRevision((n) => n + 1);
-              bumpGlance();
-            }}
-            onGlanceRelevantMutation={bumpGlance}
-            onSelectEntry={(id) => {
-              setSelectedEntryId(id);
-              setRevealNonce((n) => n + 1);
-            }}
-          />
+          {/* Conditional detail panel: rendered only while an entry is
+              selected, so the Timeline uses the full width otherwise.
+              Provenance "View source" moves selectedEntryId A -> B (never
+              null), so the panel stays mounted and swaps content in place —
+              no close/reopen flicker. Closing sets selectedEntryId back to
+              null (explicit deselection); it mutates no backend state. */}
+          {selectedEntryId && (
+            <ContextPanel
+              patientId={patientId}
+              entryId={selectedEntryId}
+              onClose={() => setSelectedEntryId(null)}
+              onEntryMutated={() => {
+                // A Timeline entry changed (edit / revert / conflict
+                // override): refresh the Timeline list AND Glance Recent
+                // Changes (the entry's updatedAt moved).
+                setTimelineRevision((n) => n + 1);
+                bumpGlance();
+              }}
+              onGlanceRelevantMutation={bumpGlance}
+              onSelectEntry={(id) => {
+                setSelectedEntryId(id);
+                setRevealNonce((n) => n + 1);
+              }}
+            />
+          )}
         </div>
       ) : (
         <Timeline
