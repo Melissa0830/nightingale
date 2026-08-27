@@ -26,7 +26,11 @@ export async function GET(
 
     const entries = await prisma.timelineEntry.findMany({
       where: { patientId: patient.id },
-      orderBy: { createdAt: "asc" },
+      // Newest-first is the single source of truth for Timeline chronology
+      // (matches Glance Recent Changes' reading direction). `id` ASC is a
+      // deterministic tie-break for entries sharing an exact createdAt, so
+      // the response order never depends on database insertion order.
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       select: {
         id: true,
         patientId: true,

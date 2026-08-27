@@ -152,12 +152,16 @@ export default function Timeline({
     );
   }
 
-  // API returns createdAt ascending; reversed here for display only
-  // (newest-first, day-grouped) — a presentational reorder, not a
-  // filtering change.
-  const sorted = [...entries].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  // The API already returns newest-first with an `id` ASC tie-break. This
+  // re-sort applies the exact same rule defensively (so a day-group never
+  // renders out of order if the payload arrives unsorted) — it is not a
+  // reverse() and cannot flip the API's direction. Chronology has one
+  // effective rule: createdAt DESC, then id ASC.
+  const sorted = [...entries].sort((a, b) => {
+    const byTime = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (byTime !== 0) return byTime;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
 
   const groups: { label: string; items: TimelineEntry[] }[] = [];
   for (const entry of sorted) {
