@@ -107,10 +107,11 @@ export default function Glance({
   // an AbortController. Assignment-only, mention, Highlight-feedback, and
   // every read-only action never touch this key.
   refreshKey = 0,
-  // Optional: makes each Recent Changes row a navigation control that
-  // selects the corresponding Timeline entry (by the `entryId` already in
-  // the response) and reveals it — equivalent to clicking that Timeline
-  // row directly. No new state, no API change.
+  // Optional: makes each Recent Changes row AND each Open Actions row a
+  // navigation control that selects the owning Timeline entry (by the
+  // `entryId` / `timelineEntryId` already in the response) and reveals it —
+  // equivalent to clicking that Timeline row directly. Read-only: navigation
+  // only, never resolves/assigns/mutates. No new state, no API change.
   onSelectEntry,
 }: {
   patientId: string;
@@ -225,11 +226,23 @@ export default function Glance({
             <p className={styles.empty}>No open actions.</p>
           ) : (
             <ul className={styles.actionList}>
-              {openActions.map((a) => (
-                <li key={a.commentId} className={styles.actionItem}>
-                  {a.content}
-                </li>
-              ))}
+              {openActions.map((a) =>
+                onSelectEntry ? (
+                  <li key={a.commentId}>
+                    <button
+                      type="button"
+                      className={`${styles.actionItem} ${styles.actionButton}`}
+                      onClick={() => onSelectEntry(a.timelineEntryId)}
+                    >
+                      {a.content}
+                    </button>
+                  </li>
+                ) : (
+                  <li key={a.commentId} className={styles.actionItem}>
+                    {a.content}
+                  </li>
+                ),
+              )}
             </ul>
           )}
           {data.openActions.length > openActions.length && (
