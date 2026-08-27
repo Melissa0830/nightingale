@@ -208,7 +208,6 @@ export default function ContextPanel({
   onClose,
   onEntryMutated,
   onGlanceRelevantMutation,
-  onSelectEntry,
 }: {
   patientId: string;
   entryId: string | null;
@@ -222,9 +221,6 @@ export default function ContextPanel({
   // but NOT the Timeline — currently only comment create / resolve /
   // reopen (openActions). Narrow refresh notification, nothing more.
   onGlanceRelevantMutation?: () => void;
-  // Provenance "Jump to source": ask the parent to select (and reveal) a
-  // linked source Timeline entry. Read-only navigation only.
-  onSelectEntry?: (id: string) => void;
 }) {
   if (!entryId) {
     return (
@@ -249,7 +245,6 @@ export default function ContextPanel({
       onClose={onClose}
       onEntryMutated={onEntryMutated}
       onGlanceRelevantMutation={onGlanceRelevantMutation}
-      onSelectEntry={onSelectEntry}
     />
   );
 }
@@ -260,14 +255,12 @@ function ContextPanelDetail({
   onClose,
   onEntryMutated,
   onGlanceRelevantMutation,
-  onSelectEntry,
 }: {
   patientId: string;
   entryId: string;
   onClose?: () => void;
   onEntryMutated: () => void;
   onGlanceRelevantMutation?: () => void;
-  onSelectEntry?: (id: string) => void;
 }) {
   const identity = useAuthIdentity();
   const [entryStatus, setEntryStatus] = useState<EntryStatus>(() =>
@@ -785,7 +778,7 @@ function ContextPanelDetail({
                 <div className={styles.sourceBlock}>
                   <p className={styles.sourceTitle}>Source context</p>
                   <p className={styles.meta}>
-                    Linked source entry:{" "}
+                    Source entry:{" "}
                     {typeLabel(entry, classification)}
                   </p>
                   {h.entryProvenanceType !== "none" && (
@@ -811,19 +804,9 @@ function ContextPanelDetail({
                     </p>
                   ) : (
                     <p className={styles.meta}>
-                      The source entry is linked, but its current content does not
-                      contain this exact quoted text, so no exact anchor is shown.
+                      This entry&apos;s current content does not contain the exact
+                      quoted text, so no exact anchor is shown.
                     </p>
-                  )}
-
-                  {onSelectEntry && (
-                    <button
-                      type="button"
-                      className={styles.sourceButton}
-                      onClick={() => onSelectEntry(h.entryId)}
-                    >
-                      Jump to source
-                    </button>
                   )}
                 </div>
               </li>

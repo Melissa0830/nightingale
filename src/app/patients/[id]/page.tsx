@@ -55,11 +55,12 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
   const bumpGlance = () => setGlanceRefreshKey((k) => k + 1);
 
   // Select a Timeline entry and ask the Timeline to scroll it into view.
-  // Shared by provenance "View source" and Recent Changes click-through so
-  // both behave exactly like a direct Timeline row click: selectedEntryId
-  // moves (never to null, so the Context panel swaps content in place with
-  // no close/reopen), and revealNonce bumps so re-selecting the same id
-  // still scrolls. No new state — reuses the one selected-entry model.
+  // The single shared path for external navigation into an entry — Glance
+  // "Recent Changes" and "Open Actions" both call it. Behaves like a direct
+  // Timeline row click: selectedEntryId moves (never to null, so the Context
+  // panel swaps content in place with no close/reopen), and revealNonce
+  // bumps so re-selecting the same id still scrolls. No new state — reuses
+  // the one selected-entry model. Read-only: never calls bumpGlance.
   const revealEntry = (id: string) => {
     setSelectedEntryId(id);
     setRevealNonce((n) => n + 1);
@@ -180,7 +181,6 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
                 bumpGlance();
               }}
               onGlanceRelevantMutation={bumpGlance}
-              onSelectEntry={revealEntry}
             />
           )}
         </div>
