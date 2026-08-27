@@ -1,16 +1,23 @@
+"use client";
+
+import Link from "next/link";
+import { useAuthIdentity } from "./AppShell";
 import styles from "./RoleNav.module.css";
 
-// Block 1 scope: /patients does not exist until Block 2, so the item is
-// shown but not a link — avoids a dead link while still communicating the
-// intended next workspace. No other nav items: Analytics/Reports/
-// Appointments/etc. are explicitly out of scope for this product.
+// Staff/Clinician/Admin get the demo patient selector; Patient goes
+// directly to their own record (no browseable directory is offered to
+// Patient — see src/app/patients/page.tsx for the server-enforced reason).
 export default function RoleNav() {
+  const identity = useAuthIdentity();
+  const isPatient = identity.role === "Patient";
+  const href = isPatient && identity.patientId ? `/patients/${identity.patientId}` : "/patients";
+  const label = isPatient ? "My Care" : "Patients";
+
   return (
     <nav className={styles.nav} aria-label="Primary">
-      <button type="button" className={styles.item} disabled title="Available in the next block">
-        Patients
-        <span className={styles.badge}>Soon</span>
-      </button>
+      <Link href={href} className={styles.item}>
+        {label}
+      </Link>
     </nav>
   );
 }

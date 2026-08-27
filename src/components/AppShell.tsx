@@ -1,10 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getToken, clearToken, fetchMe, type AuthIdentity } from "@/lib/auth-client";
 import RoleNav from "./RoleNav";
 import styles from "./AppShell.module.css";
+
+// Exposes the identity AppShell already resolved (role/clinicId/patientId)
+// to descendants (RoleNav, the /patients pages) so they don't each make
+// their own redundant /auth/me call. Small, single-purpose context — not a
+// general state-management layer.
+const AuthContext = createContext<AuthIdentity | null>(null);
+
+export function useAuthIdentity(): AuthIdentity {
+  const identity = useContext(AuthContext);
+  if (!identity) {
+    throw new Error("useAuthIdentity must be used within AppShell");
+  }
+  return identity;
+}
 
 // Owns the browser-only auth check (token presence + /auth/me validation)
 // so that src/app/page.tsx can stay a Server Component. Renders nothing of
@@ -55,23 +69,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className={styles.shell}>
-      <header className={styles.topbar}>
-        <span className={styles.brand}>NIGHTINGALE</span>
-        <div className={styles.identity}>
-          <span className={styles.roleBadge}>{identity.role}</span>
-          <span className={styles.userId}>{identity.id}</span>
-          <button type="button" className={styles.logout} onClick={handleLogout}>
-            Logout
-          </button>
+    <AuthContext.Provider value={identity}>
+      <div className={styles.shell}>
+        <header className={styles.topbar}>
+          <span className={styles.brand}>NIGHTINGALE</span>
+          <div className={styles.identity}>
+            <span className={styles.roleBadge}>{identity.role}</span>
+            <span className={styles.userId}>{identity.id}</span>
+            <button type="button" className={styles.logout} onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
+        </header>
+        <div className={styles.body}>
+          <aside className={styles.sidebar}>
+            <RoleNav />
+          </aside>
+          <main className={styles.content}>{children}</main>
         </div>
-      </header>
-      <div className={styles.body}>
-        <aside className={styles.sidebar}>
-          <RoleNav />
-        </aside>
-        <main className={styles.content}>{children}</main>
       </div>
-    </div>
+    </AuthContext.Provider>
   );
 }
