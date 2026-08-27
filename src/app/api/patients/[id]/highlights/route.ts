@@ -1,6 +1,5 @@
 import { authenticate } from "@/lib/auth/jwt";
 import { assertPatientAccess } from "@/lib/auth/clinic-scope";
-import { isPatientVisibleEntry } from "@/lib/auth/patient-filter";
 import { ApiError, toErrorResponse } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { classifyRiskFloor } from "@/lib/risk/classify-risk";
@@ -41,6 +40,17 @@ export async function GET(
 ): Promise<Response> {
   try {
     const user = authenticate(request);
+
+    // Internal Highlights (risk flags, adaptive/feedback metadata, and the
+    // linked internal entry content) are a clinical-workflow surface with no
+    // legitimate Patient use — identical stance to Glance and internal
+    // comments. Patient is rejected before any DB access at all, so the
+    // endpoint cannot be used to enumerate internal Highlight existence.
+    // This is stronger than metadata-stripping: a Patient retrieves nothing.
+    if (user.role === "Patient") {
+      throw new ApiError(403, "Forbidden");
+    }
+
     const { id } = await params;
 
     const patient = await prisma.patient.findUnique({
@@ -51,8 +61,9 @@ export async function GET(
       throw new ApiError(404, "Patient not found");
     }
 
-    // resource 存在但跨 clinic -> 403
-    // Patient 存取他人 patient 的 highlights -> 403
+    // Resource exists but belongs to another clinic -> 403 (all roles,
+    // including Admin). Patient role is already denied above, so this is
+    // effectively a clinic-scope check for the remaining staff roles.
     assertPatientAccess(user, patient);
 
     const highlights = await prisma.highlight.findMany({
@@ -68,7 +79,6 @@ export async function GET(
         createdAt: true,
         entry: {
           select: {
-            type: true,
             content: true,
             provenanceType: true,
             provenanceId: true,
@@ -78,16 +88,7 @@ export async function GET(
       orderBy: { createdAt: "asc" },
     });
 
-    // Reuse the same whitelist as the timeline routes. Filtering happens
-    // BEFORE the response is built — an internal-entry highlight is fully
-    // absent from the array (no placeholder, no redacted shell), and no
-    // count/total field anywhere reveals how many were removed.
-    const visibleHighlights =
-      user.role === "Patient"
-        ? highlights.filter((h) => isPatientVisibleEntry({ type: h.entry.type }))
-        : highlights;
-
-    function baseShape(h: (typeof visibleHighlights)[number]) {
+    function baseShape(h: (typeof highlights)[number]) {
       const content = h.entry.content;
       const occurrenceCount = countOccurrences(content, h.quotedText);
       return {
@@ -105,13 +106,6 @@ export async function GET(
         entryProvenanceType: h.entry.provenanceType,
         entryProvenanceId: h.entry.provenanceId,
       };
-    }
-
-    // Patient role: minimal shape only, original order. No riskFloor, no
-    // adaptive/feedback/pattern metadata is ever sent to a Patient — this is
-    // a server-side guarantee, not a UI concern.
-    if (user.role === "Patient") {
-      return Response.json(visibleHighlights.map(baseShape));
     }
 
     // ─── Feedback-Informed Adaptive Highlight Prioritization ──────────────
@@ -171,7 +165,7 @@ export async function GET(
       });
     }
 
-    const derived = visibleHighlights.map((h) => {
+    const derived = highlights.map((h) => {
       const resolution = resolveRiskReasonBucket(
         normalizeRiskReason(h.riskReason),
         lexicalBuckets,

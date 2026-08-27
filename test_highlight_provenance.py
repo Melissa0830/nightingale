@@ -51,18 +51,18 @@ exact-match/case-sensitivity case in one fixture, per the instruction not
 to overcomplicate this file with a second insert/cleanup cycle.
 
 Role selection: GET /api/patients/:id/highlights is authorized via
-`assertPatientAccess` (clinic-scope + "Patient may only access own record"
-for Patient-role callers) — it is not restricted to a specific staff role.
-Staff and Clinician are equally valid; this file uses Clinician
-consistently, per the instruction to prefer Clinician when both are valid.
+`authenticate` + `assertPatientAccess` (clinic-scope). It is not restricted
+to a specific staff role — Staff and Clinician are equally valid; this file
+uses Clinician consistently, per the instruction to prefer Clinician when
+both are valid.
 
-Patient visibility (verified from source): the route filters results for
-Patient-role callers via the same `isPatientVisibleEntry()` allow-list used
-elsewhere (only `patient_session_summary` is Patient-visible). The negative
-fixture below targets the seeded `ai_doctor_consult_summary` entry
-(Patient-invisible), so the same fixture is reused to verify the Patient
-visibility boundary in addition to provenance detection, per the
-instruction to avoid creating extra unrelated data.
+Patient access (verified from source): Block 8.1 denies the Patient role
+outright — the route returns 403 for a Patient-role caller before any
+Highlight row is read (same pre-query stance as Glance and internal
+comments). It is no longer a per-entry visibility filter. The negative
+fixture below targets the seeded `ai_doctor_consult_summary` entry, and the
+same fixture is reused to confirm that a Patient receives no Highlight
+payload at all, per the instruction to avoid creating extra unrelated data.
 
 Cleanup: the injected Highlight id is recorded the moment insertion
 succeeds and deleted in a top-level `finally` block, regardless of what
@@ -449,20 +449,23 @@ def run_tests():
         and negative.get("occurrenceCount") == 0,
     )
 
-    # ─── Patient visibility boundary (same fixture) ───────────────────────
-    print("\n-- Patient visibility boundary (same fixture) --")
+    # ─── Patient access boundary (same fixture) ───────────────────────────
+    # Block 8.1: internal Highlights are not merely metadata-stripped for a
+    # Patient — the endpoint is denied outright (403, before any Highlight
+    # row is read), so a Patient cannot retrieve or enumerate them at all.
+    print("\n-- Patient access boundary (same fixture) --")
     p_status, patient_highlights = get_highlights("patient_a")
-    patient_sees_negative = find_highlight(patient_highlights, negative_id)
-    patient_sees_positive = find_highlight(patient_highlights, HIGHLIGHT_AI_ID)
     check(
-        "V1. Patient does NOT receive the injected Highlight "
-        "(its entry is ai_doctor_consult_summary, Patient-invisible)",
-        p_status == 200 and patient_sees_negative is None,
+        "V1. Patient GET /highlights is denied server-side -> 403 "
+        "(stronger than metadata-stripping: no Highlight retrieval at all)",
+        p_status == 403,
     )
     check(
-        "V2. Patient also does not receive the seeded AI-doctor Highlight "
-        "(same visibility rule applies consistently to seed data)",
-        p_status == 200 and patient_sees_positive is None,
+        "V2. no Highlight payload is returned to the Patient — neither the "
+        "injected fixture nor the seeded AI-doctor Highlight can leak",
+        not isinstance(patient_highlights, list)
+        and find_highlight(patient_highlights, negative_id) is None
+        and find_highlight(patient_highlights, HIGHLIGHT_AI_ID) is None,
     )
 
     # ─── Defensive behavior ────────────────────────────────────────────────

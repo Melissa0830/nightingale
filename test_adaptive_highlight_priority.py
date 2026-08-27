@@ -232,30 +232,15 @@ def run_tests():
         and pa_ai.get("effectiveImportance") == 0,
     )
 
-    # ─── Patient role receives NO adaptive / riskFloor metadata ──────────
+    # ─── Patient role cannot retrieve internal Highlights at all ─────────
+    # Block 8.1: stronger than "no adaptive/riskFloor metadata" — the
+    # Patient role is denied the endpoint outright (403, pre-query), so no
+    # Highlight payload (base or derived) ever reaches a Patient.
     status, rows_patient = get_highlights("patient_a", PATIENT_A)
-    patient_shape_ok = (
-        status == 200
-        and isinstance(rows_patient, list)
-        and len(rows_patient) == 1
-        and all(
-            k not in rows_patient[0]
-            for k in (
-                "riskFloor",
-                "acceptedCount",
-                "rejectedCount",
-                "feedbackCount",
-                "reviewCount",
-                "acceptanceRate",
-                "learningStatus",
-                "learnedAdjustment",
-                "effectiveImportance",
-                "matchMethod",
-                "lexicalOverlapScore",
-            )
-        )
+    check(
+        "E3. Patient GET /highlights -> 403, no Highlight payload returned",
+        status == 403 and not isinstance(rows_patient, list),
     )
-    check("E3. Patient role highlight payload carries no adaptive/riskFloor fields", patient_shape_ok)
 
     # ─── Phase 11: deterministic lexical-overlap grouping (live) ─────────
     x_d_pattern = find(rows_a, HL_X_D)
