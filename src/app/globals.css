@@ -1,13 +1,29 @@
 :root {
   /* Restrained clinical palette — light only for this MVP; dark mode is
      explicitly deferred, not merely unstyled. */
-  --color-bg: #f5f6f8;
+  --color-bg: #f4f6f9;
   --color-surface: #ffffff;
-  --color-border: #e2e5ea;
+  --color-surface-alt: #f8fafc;
+  --color-border: #e3e6ec;
+  --color-border-strong: #d3d7df;
   --color-text: #1a1d21;
+  --color-text-strong: #0f1419;
   --color-text-muted: #667085;
   --color-accent: #2563eb;
+  --color-accent-soft: #eef2fb;
   --color-danger: #b91c1c;
+  --color-selected-bg: #eef2fb;
+
+  /* Semantic clinical accents — used as small labels / dots / left borders
+     only, never to colour whole text blocks. Colour is always a secondary
+     cue behind an explicit text label. */
+  --color-critical: #b42318;
+  --color-critical-bg: #fef3f2;
+  --color-critical-text: #912018;
+  --role-clinician: #1d4ed8;
+  --role-staff: #0f766e;
+  --role-ai: #7c3aed;
+  --role-patient: #b45309;
 
   --radius: 8px;
 

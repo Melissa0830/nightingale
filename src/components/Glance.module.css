@@ -7,36 +7,56 @@
   margin-bottom: var(--space-6);
 }
 
-.title {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
   margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.lastUpdate {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.lastUpdateHint {
+  color: var(--color-text-muted);
+  opacity: 0.75;
 }
 
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .block {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+}
+
+.wide {
+  grid-column: 1 / -1;
 }
 
 .primary {
-  border-color: var(--color-border);
+  border-color: var(--color-border-strong);
 }
 
 .blockTitle {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-strong);
   margin-bottom: 2px;
 }
 
@@ -67,18 +87,19 @@
 
 .riskItem {
   padding: var(--space-2) var(--space-3);
-  border: 1px solid #d97706;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-critical);
   border-radius: var(--radius);
-  background: #fffbeb;
+  background: var(--color-critical-bg);
 }
 
 .riskLabel {
   display: inline-block;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #92400e;
+  color: var(--color-critical-text);
   margin-bottom: var(--space-1);
 }
 
@@ -132,13 +153,6 @@
 .changeTime {
   font-size: 12px;
   color: var(--color-text-muted);
-}
-
-/* Last Update */
-.lastUpdate {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--color-text);
 }
 
 @media (max-width: 720px) {

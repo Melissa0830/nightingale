@@ -55,18 +55,31 @@ function formatRelative(iso: string): string {
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-// Purely presentational label from already-returned sectionKey/type —
-// formats real data, invents nothing. sectionKey is preferred (more
-// specific); type is the fallback for the two sectionKey=null entry
-// types (patient_session_summary, ai_patient_session_summary).
+const AI_CHANGE_LABELS: Record<string, string> = {
+  ai_doctor_consult_summary: "AI Scribe · Doctor Consult",
+  ai_nurse_consult_summary: "AI Scribe · Nurse Consult",
+  ai_patient_session_summary: "AI Scribe · Patient Session",
+};
+
+// Entry-specific label from the already-returned type + sectionKey — formats
+// real Glance data, invents nothing, adds no field. Distinguishes rows that
+// previously all collapsed to "Summary updated" (e.g. the AI doctor/nurse
+// summaries both carry sectionKey="summary"). system_event is excluded by
+// the Glance route and must never be labelled here; the neutral fallback
+// only guards against an impossible payload.
 function describeEntry(entry: RecentChange): string {
-  if (entry.sectionKey) {
-    const readable = entry.sectionKey.replace(/_/g, " ");
-    return `${readable.charAt(0).toUpperCase()}${readable.slice(1)} updated`;
-  }
-  if (entry.type === "ai_patient_session_summary") return "AI patient summary updated";
-  if (entry.type === "patient_session_summary") return "Patient entry updated";
-  return "Entry updated";
+  if (entry.type === "system_event") return "Entry updated";
+
+  const ai = AI_CHANGE_LABELS[entry.type];
+  if (ai) return `${ai} updated`;
+  if (entry.type === "patient_session_summary") return "Patient Summary updated";
+
+  const section = entry.sectionKey
+    ? entry.sectionKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : null;
+  if (entry.type === "clinician_note") return `Clinician ${section ?? "Note"} updated`;
+  if (entry.type === "staff_note") return "Staff Note updated";
+  return `${section ?? "Entry"} updated`;
 }
 
 export default function Glance({
@@ -152,7 +165,15 @@ export default function Glance({
 
   return (
     <section className={styles.glance} aria-label="Glance">
-      <h2 className={styles.title}>Glance</h2>
+      <div className={styles.header}>
+        <h2 className={styles.title}>Glance</h2>
+        {lastUpdate && (
+          <span className={styles.lastUpdate}>
+            Last update {formatRelative(lastUpdate)}
+            <span className={styles.lastUpdateHint}> · by last edit time</span>
+          </span>
+        )}
+      </div>
       <div className={styles.grid}>
         <div className={`${styles.block} ${styles.primary}`}>
           <h3 className={styles.blockTitle}>
@@ -197,7 +218,7 @@ export default function Glance({
           )}
         </div>
 
-        <div className={styles.block}>
+        <div className={`${styles.block} ${styles.wide}`}>
           <h3 className={styles.blockTitle}>Recent Changes</h3>
           <p className={styles.blockSubtitle}>By last edit time</p>
           {recentChanges.length === 0 ? (
@@ -212,13 +233,6 @@ export default function Glance({
               ))}
             </ul>
           )}
-        </div>
-
-        <div className={styles.block}>
-          <h3 className={styles.blockTitle}>Last Update</h3>
-          <p className={styles.lastUpdate}>
-            {lastUpdate ? formatRelative(lastUpdate) : "No recent updates"}
-          </p>
         </div>
       </div>
     </section>
