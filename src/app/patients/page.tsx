@@ -11,24 +11,32 @@ import styles from "./patients.module.css";
 // navigation shim over the known seeded fixture IDs from prisma/seed.ts,
 // not a real patient directory. The server (GET /api/patients/:id) remains
 // the actual access-control boundary regardless of what this list shows.
+// Order is the intended demo narrative: the Learning Patient is the single
+// official end-to-end walkthrough; Patient A is the standard synthetic
+// record kept as the regression baseline, not a second demo.
 const DEMO_PATIENTS: {
   id: string;
   clinicId: string;
   label: string;
-  tag?: string;
+  tag: string;
 }[] = [
-  {
-    id: "synthetic-patient-a",
-    clinicId: "synthetic-clinic-a",
-    label: "Synthetic Patient A",
-    tag: "Standard clinical workflow",
-  },
-  { id: "synthetic-patient-b", clinicId: "synthetic-clinic-b", label: "Synthetic Patient B" },
   {
     id: "synthetic-patient-learning",
     clinicId: "synthetic-clinic-a",
     label: "Synthetic Learning Patient",
-    tag: "Full workflow with adaptive prioritization",
+    tag: "Full Workflow Demo",
+  },
+  {
+    id: "synthetic-patient-a",
+    clinicId: "synthetic-clinic-a",
+    label: "Synthetic Patient A",
+    tag: "Standard synthetic record",
+  },
+  {
+    id: "synthetic-patient-b",
+    clinicId: "synthetic-clinic-b",
+    label: "Synthetic Patient B",
+    tag: "Standard synthetic record",
   },
 ];
 
@@ -66,17 +74,18 @@ function PatientsSelector() {
     <div>
       <h1 className={styles.title}>Patients</h1>
       <p className={styles.disclaimer}>
-        Demo records for this prototype — not a production patient directory.
+        Seeded synthetic records for this prototype — not a production patient
+        directory.
       </p>
       {visible.length === 0 ? (
-        <p className={styles.empty}>No demo patients available for your clinic.</p>
+        <p className={styles.empty}>No synthetic records available for your clinic.</p>
       ) : (
         <ul className={styles.list}>
           {visible.map((p) => (
             <li key={p.id} className={styles.item}>
               <div>
                 <p className={styles.name}>{p.label}</p>
-                <p className={styles.tag}>{p.tag ?? "Demo record"}</p>
+                <p className={styles.tag}>{p.tag}</p>
               </div>
               <Link href={`/patients/${p.id}`} className={styles.open}>
                 Open patient
