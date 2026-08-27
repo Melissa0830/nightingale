@@ -105,9 +105,11 @@
 
 .adaptiveList {
   margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-border);
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 2px var(--space-3);
+  gap: 3px var(--space-3);
   font-size: 12px;
 }
 
@@ -117,16 +119,18 @@
 
 .adaptiveList dd {
   color: var(--color-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .adaptiveNote {
   margin-top: var(--space-1);
+  padding-left: var(--space-3);
   font-size: 11px;
   color: var(--color-text-muted);
 }
 
 .recalcNote {
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
   font-size: 12px;
   font-weight: 500;
   color: var(--color-text);
