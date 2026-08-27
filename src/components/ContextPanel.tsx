@@ -53,6 +53,10 @@ interface Highlight {
   learningStatus: "no_feedback" | "gathering_feedback" | "adaptive";
   learnedAdjustment: number;
   effectiveImportance: number;
+  matchMethod: "exact" | "lexical" | "none";
+  lexicalOverlapScore: number | null;
+  matchedPattern: string | null;
+  matchedBucketRepresentativeId: string | null;
 }
 
 type EntryStatus = "loading" | "ok" | "forbidden" | "notfound" | "error";
@@ -156,6 +160,16 @@ function adaptiveExplanation(h: Highlight): string {
     return "Minimum 3 reviewed examples required before adaptive adjustment.";
   }
   return "No clinician feedback recorded for this recurring pattern yet.";
+}
+
+// Deterministic exact-text match first, deterministic lexical-token overlap
+// fallback second. Never described as semantic or clinical equivalence.
+function patternText(h: Highlight): string {
+  if (h.matchMethod === "exact") return "Exact recurring pattern";
+  if (h.matchMethod === "lexical" && h.lexicalOverlapScore !== null) {
+    return `Related lexical pattern · ${Math.round(h.lexicalOverlapScore * 100)}% overlap`;
+  }
+  return "No recurring pattern";
 }
 
 // Route-confirmed section ownership (src/lib/auth/section-ownership.ts).
@@ -644,6 +658,8 @@ function ContextPanelDetail({
                   <dd>{feedbackEvidenceText(h)}</dd>
                   <dt>Adjustment</dt>
                   <dd>{adjustmentText(h.learnedAdjustment)}</dd>
+                  <dt>Pattern</dt>
+                  <dd>{patternText(h)}</dd>
                 </dl>
                 <p className={styles.adaptiveNote}>{adaptiveExplanation(h)}</p>
 

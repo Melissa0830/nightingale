@@ -52,7 +52,9 @@ PATIENT_LEARNING_B = "synthetic-patient-learning-b"
 PATIENT_A = "synthetic-patient-a"
 
 HL_X_A = "synthetic-highlight-learning-x-a"
+HL_X_LEX = "synthetic-highlight-learning-x-lex"
 HL_Y_E = "synthetic-highlight-learning-y-e"
+HL_Z_D = "synthetic-highlight-learning-z-d"
 HL_X_D = "synthetic-highlight-learning-x-d"
 HL_Y_G = "synthetic-highlight-learning-y-g"
 HL_XB_D = "synthetic-highlight-learning-xb-d"
@@ -254,6 +256,61 @@ def run_tests():
         )
     )
     check("E3. Patient role highlight payload carries no adaptive/riskFloor fields", patient_shape_ok)
+
+    # ─── Phase 11: deterministic lexical-overlap grouping (live) ─────────
+    x_d_pattern = find(rows_a, HL_X_D)
+    check(
+        "L1. identical-wording pending target -> matchMethod 'exact', "
+        "lexicalOverlapScore 1",
+        x_d_pattern is not None
+        and x_d_pattern.get("matchMethod") == "exact"
+        and x_d_pattern.get("lexicalOverlapScore") == 1,
+    )
+    x_lex = find(rows_a, HL_X_LEX)
+    check(
+        "L2. non-identical wording ('respiratory' inserted) -> matchMethod "
+        "'lexical', overlap >= 0.6, attached to bucket X (adj +2)",
+        x_lex is not None
+        and x_lex.get("matchMethod") == "lexical"
+        and x_lex.get("lexicalOverlapScore") is not None
+        and x_lex.get("lexicalOverlapScore") >= 0.6
+        and x_lex.get("acceptedCount") == 3
+        and x_lex.get("rejectedCount") == 0
+        and x_lex.get("learnedAdjustment") == 2
+        and x_lex.get("matchedBucketRepresentativeId") == HL_X_A,
+    )
+    z_d = find(rows_a, HL_Z_D)
+    check(
+        "L3. bucket Z target still resolves to its own exact bucket "
+        "(no lexical bleed from X/Y): matchMethod exact, adj -2",
+        z_d is not None
+        and z_d.get("matchMethod") == "exact"
+        and z_d.get("learnedAdjustment") == -2,
+    )
+    # Clinic B: the lexical demo highlight does not exist there; its bucket X
+    # target stays -2 and cannot be pulled toward Clinic A's +2 evidence.
+    s_b, rows_b = get_highlights("clinician_b", PATIENT_LEARNING_B)
+    xb_d = find(rows_b, "synthetic-highlight-learning-xb-d") if isinstance(rows_b, list) else None
+    check(
+        "L4. lexical grouping is clinic-scoped: Clinic B bucket X target "
+        "unaffected (still 0/3/-2)",
+        xb_d is not None
+        and xb_d.get("acceptedCount") == 0
+        and xb_d.get("rejectedCount") == 3
+        and xb_d.get("learnedAdjustment") == -2,
+    )
+    # Determinism: repeat the GET, identical grouping result.
+    s_r, rows_r = get_highlights("clinician_a", PATIENT_LEARNING)
+    x_lex_again = find(rows_r, HL_X_LEX) if isinstance(rows_r, list) else None
+    check(
+        "L5. repeated GET yields identical lexical resolution "
+        "(method, score, representative)",
+        x_lex_again is not None
+        and x_lex_again.get("matchMethod") == x_lex.get("matchMethod")
+        and x_lex_again.get("lexicalOverlapScore") == x_lex.get("lexicalOverlapScore")
+        and x_lex_again.get("matchedBucketRepresentativeId")
+        == x_lex.get("matchedBucketRepresentativeId"),
+    )
 
     # ─── Phase 8: server-confirmed live recalculation + PATCH self-restore ─
     token_a = login("clinician_a")

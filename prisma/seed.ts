@@ -46,6 +46,7 @@ const HL_LEARN_X_A_ID = "synthetic-highlight-learning-x-a"; // accepted
 const HL_LEARN_X_B_ID = "synthetic-highlight-learning-x-b"; // accepted
 const HL_LEARN_X_C_ID = "synthetic-highlight-learning-x-c"; // accepted
 const HL_LEARN_X_D_ID = "synthetic-highlight-learning-x-d"; // pending — POSITIVE demo target (+2)
+const HL_LEARN_X_LEX_ID = "synthetic-highlight-learning-x-lex"; // pending — LEXICAL match demo (non-identical wording -> bucket X)
 // Bucket Y (Clinic A, deliberately below threshold) — "medication review advised at next visit".
 const HL_LEARN_Y_E_ID = "synthetic-highlight-learning-y-e"; // accepted
 const HL_LEARN_Y_F_ID = "synthetic-highlight-learning-y-f"; // accepted
@@ -551,6 +552,9 @@ async function main() {
     { id: HL_LEARN_X_B_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_FOLLOWUP_ID, quotedText: "Persistent fatigue noted at visit two", riskReason: RISK_REASON_X_LOWER, feedback: "accepted" as const },
     { id: HL_LEARN_X_C_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_FOLLOWUP_ID, quotedText: "Persistent dizziness reported at the most recent visit", riskReason: RISK_REASON_X_SPACED, feedback: "accepted" as const },
     { id: HL_LEARN_X_D_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_FOLLOWUP_ID, quotedText: "Each was flagged for review", riskReason: RISK_REASON_X_CANONICAL, feedback: "pending" as const },
+    // Non-identical wording ("respiratory" inserted) -> no exact bucket, but a
+    // deterministic lexical match to bucket X (jaccard 5/6 ≈ 0.83).
+    { id: HL_LEARN_X_LEX_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_FOLLOWUP_ID, quotedText: "Persistent dizziness reported at the most recent visit", riskReason: "Persistent respiratory symptoms may require follow-up.", feedback: "pending" as const },
     // Bucket Y — Clinic A — two accepted (below threshold), one pending control.
     { id: HL_LEARN_Y_E_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_MEDREVIEW_ID, quotedText: "Two agents overdue for reassessment", riskReason: RISK_REASON_Y, feedback: "accepted" as const },
     { id: HL_LEARN_Y_F_ID, patientId: patientLearning.id, entryId: ENTRY_LEARNING_MEDREVIEW_ID, quotedText: "agent is due for review", riskReason: RISK_REASON_Y, feedback: "accepted" as const },

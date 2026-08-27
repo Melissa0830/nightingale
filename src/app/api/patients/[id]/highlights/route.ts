@@ -9,6 +9,11 @@ import {
   normalizeRiskReason,
 } from "@/lib/highlights/derive-adaptive-priority";
 import { orderHighlightsBySafetyThenPriority } from "@/lib/highlights/order-adaptive-highlights";
+import {
+  resolveRiskReasonBucket,
+  tokenizeRiskReason,
+  type LexicalBucket,
+} from "@/lib/highlights/lexical-grouping";
 
 // Exact, case-sensitive substring occurrence count — no normalization,
 // no regex, no dependency. Mirrors the deliberate "quotedText string
@@ -114,35 +119,67 @@ export async function GET(
     // field's meaning changes. `importance` stays the base importance.
     //
     // Aggregation scope: all NON-PENDING (accepted/rejected) Highlights in
-    // the SAME CLINIC as this patient, grouped by normalized riskReason.
-    // Clinic scope comes from patient.clinicId (DB-derived) — Clinic A
-    // feedback can never reach Clinic B and vice versa. `pending` never
-    // contributes to the threshold. Every persisted non-pending Highlight in
-    // the clinic+bucket participates, including the current Highlight's own
-    // feedback when it is accepted/rejected — a pending target is adjusted
-    // purely by prior feedback on the same recurring pattern.
+    // the SAME CLINIC as this patient. Clinic scope (patient.clinicId, DB-
+    // derived) is applied to the query FIRST — Clinic A feedback can never
+    // reach Clinic B and vice versa. `pending` never contributes.
+    //
+    // Grouping: exact normalized riskReason first; if a Highlight's reason
+    // does not exactly match any existing same-clinic bucket, a deterministic
+    // lexical-overlap fallback (see lexical-grouping.ts) may attach it to the
+    // single best-matching bucket. This is a literal-token heuristic, never
+    // semantic similarity.
     const clinicFeedbackRows = await prisma.highlight.findMany({
       where: {
         feedback: { in: ["accepted", "rejected"] },
         patient: { clinicId: patient.clinicId },
       },
-      select: { riskReason: true, feedback: true },
+      select: { id: true, riskReason: true, feedback: true, createdAt: true },
     });
 
-    const bucketCounts = new Map<string, { accepted: number; rejected: number }>();
+    const grouped = new Map<
+      string,
+      {
+        accepted: number;
+        rejected: number;
+        members: { id: string; createdAt: Date; riskReason: string }[];
+      }
+    >();
     for (const row of clinicFeedbackRows) {
       const key = normalizeRiskReason(row.riskReason);
-      const bucket = bucketCounts.get(key) ?? { accepted: 0, rejected: 0 };
-      if (row.feedback === "accepted") bucket.accepted += 1;
-      else bucket.rejected += 1;
-      bucketCounts.set(key, bucket);
+      const g = grouped.get(key) ?? { accepted: 0, rejected: 0, members: [] };
+      if (row.feedback === "accepted") g.accepted += 1;
+      else g.rejected += 1;
+      g.members.push({ id: row.id, createdAt: row.createdAt, riskReason: row.riskReason });
+      grouped.set(key, g);
+    }
+
+    const bucketCounts = new Map<string, { accepted: number; rejected: number }>();
+    const lexicalBuckets: LexicalBucket[] = [];
+    for (const [key, g] of grouped) {
+      bucketCounts.set(key, { accepted: g.accepted, rejected: g.rejected });
+      // Deterministic representative: earliest createdAt, then id ASC.
+      const representative = [...g.members].sort((a, b) => {
+        const byTime = a.createdAt.getTime() - b.createdAt.getTime();
+        if (byTime !== 0) return byTime;
+        return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      })[0];
+      lexicalBuckets.push({
+        key,
+        representativeId: representative.id,
+        representativeRiskReason: representative.riskReason,
+        tokenSet: tokenizeRiskReason(normalizeRiskReason(representative.riskReason)),
+      });
     }
 
     const derived = visibleHighlights.map((h) => {
-      const bucket = bucketCounts.get(normalizeRiskReason(h.riskReason)) ?? {
-        accepted: 0,
-        rejected: 0,
-      };
+      const resolution = resolveRiskReasonBucket(
+        normalizeRiskReason(h.riskReason),
+        lexicalBuckets,
+      );
+      const bucket =
+        resolution.matchedKey !== null
+          ? bucketCounts.get(resolution.matchedKey) ?? { accepted: 0, rejected: 0 }
+          : { accepted: 0, rejected: 0 };
       const adaptive = deriveAdaptivePriority({
         baseImportance: h.importance,
         acceptedCount: bucket.accepted,
@@ -166,6 +203,11 @@ export async function GET(
         learningStatus: adaptive.learningStatus,
         learnedAdjustment: adaptive.learnedAdjustment,
         effectiveImportance: adaptive.effectiveImportance,
+        // Grouping traceability (derived, not persisted).
+        matchMethod: resolution.matchMethod,
+        lexicalOverlapScore: resolution.lexicalOverlapScore,
+        matchedPattern: resolution.matchedPattern,
+        matchedBucketRepresentativeId: resolution.matchedBucketRepresentativeId,
       };
     });
 
