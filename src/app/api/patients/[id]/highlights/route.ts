@@ -3,10 +3,12 @@ import { assertPatientAccess } from "@/lib/auth/clinic-scope";
 import { isPatientVisibleEntry } from "@/lib/auth/patient-filter";
 import { ApiError, toErrorResponse } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { classifyRiskFloor } from "@/lib/risk/classify-risk";
 import {
   deriveAdaptivePriority,
   normalizeRiskReason,
 } from "@/lib/highlights/derive-adaptive-priority";
+import { orderHighlightsBySafetyThenPriority } from "@/lib/highlights/order-adaptive-highlights";
 
 // Exact, case-sensitive substring occurrence count — no normalization,
 // no regex, no dependency. Mirrors the deliberate "quotedText string
@@ -80,7 +82,34 @@ export async function GET(
         ? highlights.filter((h) => isPatientVisibleEntry({ type: h.entry.type }))
         : highlights;
 
-    // ─── Feedback-Informed Adaptive Highlight Prioritization (Bonus) ──────
+    function baseShape(h: (typeof visibleHighlights)[number]) {
+      const content = h.entry.content;
+      const occurrenceCount = countOccurrences(content, h.quotedText);
+      return {
+        id: h.id,
+        patientId: h.patientId,
+        entryId: h.entryId,
+        quotedText: h.quotedText,
+        riskReason: h.riskReason,
+        importance: h.importance,
+        feedback: h.feedback,
+        createdAt: h.createdAt,
+        quotedTextFound: occurrenceCount > 0,
+        occurrenceCount,
+        entryContent: content,
+        entryProvenanceType: h.entry.provenanceType,
+        entryProvenanceId: h.entry.provenanceId,
+      };
+    }
+
+    // Patient role: minimal shape only, original order. No riskFloor, no
+    // adaptive/feedback/pattern metadata is ever sent to a Patient — this is
+    // a server-side guarantee, not a UI concern.
+    if (user.role === "Patient") {
+      return Response.json(visibleHighlights.map(baseShape));
+    }
+
+    // ─── Feedback-Informed Adaptive Highlight Prioritization ──────────────
     // Read-time derivation only — nothing below is persisted, and no existing
     // field's meaning changes. `importance` stays the base importance.
     //
@@ -109,10 +138,7 @@ export async function GET(
       bucketCounts.set(key, bucket);
     }
 
-    const response = visibleHighlights.map((h) => {
-      const content = h.entry.content;
-      const occurrenceCount = countOccurrences(content, h.quotedText);
-
+    const derived = visibleHighlights.map((h) => {
       const bucket = bucketCounts.get(normalizeRiskReason(h.riskReason)) ?? {
         accepted: 0,
         rejected: 0,
@@ -122,22 +148,16 @@ export async function GET(
         acceptedCount: bucket.accepted,
         rejectedCount: bucket.rejected,
       });
-
-      return {
-        id: h.id,
-        patientId: h.patientId,
-        entryId: h.entryId,
+      // riskFloor is the deterministic safety boundary, computed here purely
+      // from quotedText + riskReason. Adaptive logic never feeds it.
+      const riskFloor = classifyRiskFloor({
         quotedText: h.quotedText,
         riskReason: h.riskReason,
-        importance: h.importance,
-        feedback: h.feedback,
-        createdAt: h.createdAt,
-        quotedTextFound: occurrenceCount > 0,
-        occurrenceCount,
-        entryContent: content,
-        entryProvenanceType: h.entry.provenanceType,
-        entryProvenanceId: h.entry.provenanceId,
-        // Derived, non-persisted adaptive prioritization fields.
+      });
+
+      return {
+        ...baseShape(h),
+        riskFloor,
         acceptedCount: adaptive.acceptedCount,
         rejectedCount: adaptive.rejectedCount,
         feedbackCount: adaptive.feedbackCount,
@@ -146,7 +166,9 @@ export async function GET(
       };
     });
 
-    return Response.json(response);
+    // Safety-first deterministic presentation order (not persisted):
+    // riskFloor severity → effectiveImportance DESC → createdAt DESC → id ASC.
+    return Response.json(orderHighlightsBySafetyThenPriority(derived));
   } catch (error) {
     return toErrorResponse(error);
   }
