@@ -75,12 +75,17 @@ function timeLabel(iso: string): string {
   });
 }
 
-export default function Timeline({ patientId }: { patientId: string }) {
+interface TimelineProps {
+  patientId: string;
+  selectedEntryId: string | null;
+  onSelectEntry: (id: string | null) => void;
+}
+
+export default function Timeline({ patientId, selectedEntryId, onSelectEntry }: TimelineProps) {
   const identity = useAuthIdentity();
   const isPatient = identity.role === "Patient";
   const [status, setStatus] = useState<Status>(() => (getToken() ? "loading" : "error"));
   const [entries, setEntries] = useState<TimelineEntry[]>([]);
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
   useEffect(() => {
     const token = getToken();
@@ -177,7 +182,7 @@ export default function Timeline({ patientId }: { patientId: string }) {
                       selected ? styles.rowSelected : ""
                     }`}
                     aria-pressed={selected}
-                    onClick={() => setSelectedEntryId(selected ? null : entry.id)}
+                    onClick={() => onSelectEntry(selected ? null : entry.id)}
                   >
                     <span className={styles.time}>{timeLabel(entry.createdAt)}</span>
                     <span className={styles.rowBody}>

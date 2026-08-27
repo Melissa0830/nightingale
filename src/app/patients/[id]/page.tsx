@@ -6,6 +6,7 @@ import AppShell, { useAuthIdentity } from "@/components/AppShell";
 import PatientHeader, { type PatientSummary } from "@/components/PatientHeader";
 import Glance from "@/components/Glance";
 import Timeline from "@/components/Timeline";
+import ContextPanel from "@/components/ContextPanel";
 import { getToken, clearToken } from "@/lib/auth-client";
 import styles from "./patient-detail.module.css";
 
@@ -33,6 +34,7 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
   const identity = useAuthIdentity();
   const [status, setStatus] = useState<Status>("loading");
   const [patient, setPatient] = useState<PatientSummary | null>(null);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
   useEffect(() => {
     const token = getToken();
@@ -92,18 +94,36 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
     return <p className={styles.state}>Something went wrong loading this patient.</p>;
   }
 
-  // Glance is fetched only for non-Patient roles. Patient never sees it —
-  // matching the server's own 403 for that role on this route (see
-  // src/app/api/patients/[id]/glance/route.ts) — so no fetch is even
-  // attempted here rather than fetching and hiding the result. Timeline
-  // is the same component for every role — it reads identity internally
-  // and presents itself accordingly (heading, empty-state wording, and
-  // omitting versionNumber/provenance metadata for Patient rows).
+  // Glance and ContextPanel are only rendered for non-Patient roles.
+  // Patient never sees either — matching the server's own 403 for Glance
+  // and the deliberate choice not to fetch Highlights/entry-detail for
+  // Patient at all (backend capability doesn't obligate frontend
+  // exposure). Timeline is the same component for every role — it reads
+  // identity internally and presents itself accordingly (heading,
+  // empty-state wording, and omitting versionNumber/provenance metadata
+  // for Patient rows). selectedEntryId/onSelectEntry are passed to
+  // Timeline for both roles for prop-shape and UX consistency with
+  // Block 4, even though Patient has no ContextPanel to react to it.
   return (
     <div>
       <PatientHeader patient={patient} />
       {identity.role !== "Patient" && <Glance patientId={patientId} />}
-      <Timeline patientId={patientId} />
+      {identity.role !== "Patient" ? (
+        <div className={styles.workspace}>
+          <Timeline
+            patientId={patientId}
+            selectedEntryId={selectedEntryId}
+            onSelectEntry={setSelectedEntryId}
+          />
+          <ContextPanel patientId={patientId} entryId={selectedEntryId} />
+        </div>
+      ) : (
+        <Timeline
+          patientId={patientId}
+          selectedEntryId={selectedEntryId}
+          onSelectEntry={setSelectedEntryId}
+        />
+      )}
     </div>
   );
 }

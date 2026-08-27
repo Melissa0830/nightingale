@@ -2,3 +2,16 @@
   font-size: 14px;
   color: var(--color-text-muted);
 }
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .workspace {
+    grid-template-columns: 60% 1fr;
+  }
+}
