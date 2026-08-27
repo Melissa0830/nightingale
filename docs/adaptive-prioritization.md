@@ -192,8 +192,25 @@ timestamp.** The v1 `learnedAdjustment` formula is unchanged.
 ## 9. Demo scenarios
 
 Navigate: **Clinician → Patients → Synthetic Learning Patient** (Clinic A,
-tagged "Adaptive prioritization demo") → open the target entry → Context Panel →
-Highlights. No URL typing required.
+tagged "Full workflow with adaptive prioritization") → open the target entry →
+Context Panel → Highlights. No URL typing required.
+
+`synthetic-patient-learning` is a **complete synthetic patient case** (Block 8),
+not a bonus-only fixture. It has an independent "intermittent fatigue" clinical
+story and carries the full workflow: a patient-facing summary, a staff note, two
+clinician plan notes plus medication and summary sections, and all three AI
+Scribe types — plus the adaptive-prioritization demo entries below.
+
+**AI Scribe entries** (internal; provenance is source linkage only, not a
+correctness claim):
+
+| Entry | Type | provenanceType / provenanceId |
+|---|---|---|
+| `synthetic-entry-learning-ai-doctor` | `ai_doctor_consult_summary` | `doctor_consult` / `synthetic-session-learning-consult-001` |
+| `synthetic-entry-learning-ai-nurse` | `ai_nurse_consult_summary` | `nurse_consult` / `synthetic-session-learning-nurse-001` |
+| `synthetic-entry-learning-ai-patient` | `ai_patient_session_summary` | `patient_session` / `synthetic-session-learning-session-001` |
+
+**Adaptive demo targets:**
 
 | Entry | Bucket | Feedback | Target result |
 |---|---|---|---|
@@ -201,10 +218,14 @@ Highlights. No URL typing required.
 | `synthetic-entry-learning-followup` | X (lexical) — "Persistent **respiratory** symptoms may require follow-up." | pending, ~0.83 overlap → bucket X | **lexical** `+2` |
 | `synthetic-entry-learning-medreview` | Y — "medication review advised at next visit" | 2 accepted + pending target | **gathering feedback** `0` |
 | `synthetic-entry-learning-riskflag` | Z — "imaging finding likely incidental; no action needed" | 3 rejected + pending target | **negative** `-2` |
+| `synthetic-entry-learning-riskflag` | none — "Chest pain reported; escalate per protocol." | pending | **critical** floor, adj `0`, sorts first |
 | `synthetic-patient-learning-b` (Clinic B) | X wording, 3 rejected | pending target | **isolated** `-2` (unaffected by Clinic A) |
 
-Seed fixtures use fixed ids and idempotent upserts; the learning entry ids are
-in the seed's exact reset list. Patient A's highlight inventory is untouched.
+The Block 8 Core entries carry **no Highlights** — deliberately, so they add zero
+lexical-bucket and zero critical-trigger collision surface, and the adaptive
+numbers above are provably unchanged. Seed fixtures use fixed ids and idempotent
+upserts; the learning entry ids are in the seed's exact reset list. Patient A's
+inventory is untouched (Patient A remains the standard-workflow case).
 
 ## 10. Truth boundaries
 

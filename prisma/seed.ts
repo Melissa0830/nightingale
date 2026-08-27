@@ -41,6 +41,19 @@ const ENTRY_LEARNING_FOLLOWUP_ID = "synthetic-entry-learning-followup";
 const ENTRY_LEARNING_MEDREVIEW_ID = "synthetic-entry-learning-medreview";
 const ENTRY_LEARNING_RISKFLAG_ID = "synthetic-entry-learning-riskflag";
 const ENTRY_LEARNING_B_FOLLOWUP_ID = "synthetic-entry-learning-b-followup";
+// Block 8: promote synthetic-patient-learning into a complete case. These
+// entries carry NO Highlights (deliberate — zero lexical-bucket and zero
+// critical-trigger collision surface). Independent "intermittent fatigue"
+// clinical story; not a copy of Patient A content.
+const ENTRY_LEARNING_PATIENT_SUMMARY_ID = "synthetic-entry-learning-patient-summary";
+const ENTRY_LEARNING_STAFF_NOTE_ID = "synthetic-entry-learning-staff-note";
+const ENTRY_LEARNING_PLAN_ID = "synthetic-entry-learning-plan";
+const ENTRY_LEARNING_AI_DOCTOR_ID = "synthetic-entry-learning-ai-doctor";
+const ENTRY_LEARNING_AI_NURSE_ID = "synthetic-entry-learning-ai-nurse";
+const ENTRY_LEARNING_AI_PATIENT_ID = "synthetic-entry-learning-ai-patient";
+const SESSION_LEARNING_DOCTOR = "synthetic-session-learning-consult-001";
+const SESSION_LEARNING_NURSE = "synthetic-session-learning-nurse-001";
+const SESSION_LEARNING_PATIENT = "synthetic-session-learning-session-001";
 // Bucket X (Clinic A) — normalizes to "persistent symptoms may require follow-up".
 const HL_LEARN_X_A_ID = "synthetic-highlight-learning-x-a"; // accepted
 const HL_LEARN_X_B_ID = "synthetic-highlight-learning-x-b"; // accepted
@@ -89,6 +102,12 @@ const syntheticEntryIds = [
   ENTRY_LEARNING_MEDREVIEW_ID,
   ENTRY_LEARNING_RISKFLAG_ID,
   ENTRY_LEARNING_B_FOLLOWUP_ID,
+  ENTRY_LEARNING_PATIENT_SUMMARY_ID,
+  ENTRY_LEARNING_STAFF_NOTE_ID,
+  ENTRY_LEARNING_PLAN_ID,
+  ENTRY_LEARNING_AI_DOCTOR_ID,
+  ENTRY_LEARNING_AI_NURSE_ID,
+  ENTRY_LEARNING_AI_PATIENT_ID,
 ];
 
 // This script is executed standalone via `node prisma/seed.ts`, not through
@@ -540,6 +559,99 @@ async function main() {
       sectionKey: spec.sectionKey,
       provenanceType: ProvenanceType.none,
       provenanceId: null,
+      versionNumber: 1,
+    };
+    await prisma.timelineEntry.upsert({
+      where: { id: spec.id },
+      create: { id: spec.id, ...shared },
+      update: shared,
+    });
+  }
+
+  // ─── Block 8: complete-case Core entries for the Learning Patient ──────
+  // Independent "intermittent fatigue" story. Deliberately low-risk wording
+  // (verified: classifyRiskFloor -> unrated for every string). No Highlights
+  // on any of these — zero lexical-bucket and zero critical-trigger surface.
+  // AI Scribe summaries are pre-written clean synthetic text (no PHI); the
+  // redactPHI gateway is exercised at runtime by test_ai_scribe_ingestion.py.
+  const learningCoreEntrySpecs = [
+    {
+      id: ENTRY_LEARNING_PATIENT_SUMMARY_ID,
+      authorRole: EntryAuthorRole.Patient,
+      authorId: null as string | null,
+      type: EntryType.patient_session_summary,
+      sectionKey: null as string | null,
+      provenanceType: ProvenanceType.none,
+      provenanceId: null as string | null,
+      content:
+        "Patient reports intermittent fatigue during daily activities over the past few weeks. Symptoms are stable today with no new concerns, and a routine follow-up is planned.",
+    },
+    {
+      id: ENTRY_LEARNING_STAFF_NOTE_ID,
+      authorRole: EntryAuthorRole.Staff,
+      authorId: staffUserA.id,
+      type: EntryType.staff_note,
+      sectionKey: "staff_note",
+      provenanceType: ProvenanceType.none,
+      provenanceId: null,
+      content:
+        "Vitals reviewed and within normal range. Patient comfortable at rest and ambulating without difficulty. Follow-up instructions confirmed and understood.",
+    },
+    {
+      id: ENTRY_LEARNING_PLAN_ID,
+      authorRole: EntryAuthorRole.Clinician,
+      authorId: clinicianUserA.id,
+      type: EntryType.clinician_note,
+      sectionKey: "plan",
+      provenanceType: ProvenanceType.none,
+      provenanceId: null,
+      content:
+        "Continue symptom monitoring and lifestyle measures. Review energy levels and sleep pattern at the scheduled follow-up appointment in four weeks.",
+    },
+    {
+      id: ENTRY_LEARNING_AI_DOCTOR_ID,
+      authorRole: EntryAuthorRole.system,
+      authorId: null,
+      type: EntryType.ai_doctor_consult_summary,
+      sectionKey: "summary",
+      provenanceType: ProvenanceType.doctor_consult,
+      provenanceId: SESSION_LEARNING_DOCTOR,
+      content:
+        "AI Scribe Summary (doctor_consult): post-consult review of intermittent fatigue; most likely related to a recent change in sleep pattern. Advised sleep hygiene measures and follow-up in four weeks.",
+    },
+    {
+      id: ENTRY_LEARNING_AI_NURSE_ID,
+      authorRole: EntryAuthorRole.system,
+      authorId: null,
+      type: EntryType.ai_nurse_consult_summary,
+      sectionKey: "summary",
+      provenanceType: ProvenanceType.nurse_consult,
+      provenanceId: SESSION_LEARNING_NURSE,
+      content:
+        "AI Scribe Summary (nurse_consult): nurse follow-up covering activity pacing, hydration, and rest planning. Patient understands the plan and will track daily energy levels before the next visit.",
+    },
+    {
+      id: ENTRY_LEARNING_AI_PATIENT_ID,
+      authorRole: EntryAuthorRole.system,
+      authorId: null,
+      type: EntryType.ai_patient_session_summary,
+      sectionKey: "summary",
+      provenanceType: ProvenanceType.patient_session,
+      provenanceId: SESSION_LEARNING_PATIENT,
+      content:
+        "AI Scribe Summary (patient_session): pre-visit check-in. Patient describes stable fatigue, no new symptoms, and confirms the upcoming appointment and current supportive measures.",
+    },
+  ];
+  for (const spec of learningCoreEntrySpecs) {
+    const shared = {
+      patientId: patientLearning.id,
+      authorRole: spec.authorRole,
+      authorId: spec.authorId,
+      type: spec.type,
+      content: spec.content,
+      sectionKey: spec.sectionKey,
+      provenanceType: spec.provenanceType,
+      provenanceId: spec.provenanceId,
       versionNumber: 1,
     };
     await prisma.timelineEntry.upsert({
