@@ -39,6 +39,10 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
   // successful timeline-entry edit/revert, so the self-fetching Timeline
   // refetches. Not app-wide state — owned here, passed only to Timeline.
   const [timelineRevision, setTimelineRevision] = useState(0);
+  // Bumped whenever ContextPanel asks to reveal a source entry (provenance
+  // "Jump to source"). Timeline scrolls the matching row into view on every
+  // bump — even when the entry id is unchanged, so re-jumping still moves.
+  const [revealNonce, setRevealNonce] = useState(0);
 
   useEffect(() => {
     const token = getToken();
@@ -119,11 +123,16 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
             selectedEntryId={selectedEntryId}
             onSelectEntry={setSelectedEntryId}
             refreshSignal={timelineRevision}
+            revealSignal={revealNonce}
           />
           <ContextPanel
             patientId={patientId}
             entryId={selectedEntryId}
             onEntryMutated={() => setTimelineRevision((n) => n + 1)}
+            onSelectEntry={(id) => {
+              setSelectedEntryId(id);
+              setRevealNonce((n) => n + 1);
+            }}
           />
         </div>
       ) : (

@@ -5,6 +5,7 @@ import { getToken } from "@/lib/auth-client";
 import { useAuthIdentity } from "./AppShell";
 import CommentsSection from "./CommentsSection";
 import VersionHistory from "./VersionHistory";
+import { locateQuote } from "@/lib/provenance/locate-quote";
 import styles from "./ContextPanel.module.css";
 
 // Mirrors GET /api/timeline/:id exactly (re-confirmed against the
@@ -113,10 +114,17 @@ function formatDateTime(iso: string): string {
   return `${day} · ${time}`;
 }
 
+// Wording is anchored to the actual match result — never "verified",
+// "confirmed", or "validated". Provenance proves a stored source linkage,
+// not clinical correctness.
 function exactQuoteStatus(h: Highlight): string {
-  if (!h.quotedTextFound) return "Exact quote not found in current entry";
-  if (h.occurrenceCount > 1) return `Exact quote found · ${h.occurrenceCount} occurrences`;
-  return "Exact quote found";
+  if (!h.quotedTextFound) {
+    return "Exact quote not found in current entry content";
+  }
+  if (h.occurrenceCount > 1) {
+    return `Exact text appears ${h.occurrenceCount} times in this entry`;
+  }
+  return "Exact quote located";
 }
 
 // ─── Adaptive-priority presentation (v2) ────────────────────────────────
@@ -198,12 +206,16 @@ export default function ContextPanel({
   patientId,
   entryId,
   onEntryMutated,
+  onSelectEntry,
 }: {
   patientId: string;
   entryId: string | null;
   // Called after a successful edit/revert so the parent can refresh the
   // Timeline (which fetches its own list). No global event bus.
   onEntryMutated: () => void;
+  // Provenance "Jump to source": ask the parent to select (and reveal) a
+  // linked source Timeline entry. Read-only navigation only.
+  onSelectEntry?: (id: string) => void;
 }) {
   if (!entryId) {
     return (
@@ -219,6 +231,7 @@ export default function ContextPanel({
       patientId={patientId}
       entryId={entryId}
       onEntryMutated={onEntryMutated}
+      onSelectEntry={onSelectEntry}
     />
   );
 }
@@ -227,10 +240,12 @@ function ContextPanelDetail({
   patientId,
   entryId,
   onEntryMutated,
+  onSelectEntry,
 }: {
   patientId: string;
   entryId: string;
   onEntryMutated: () => void;
+  onSelectEntry?: (id: string) => void;
 }) {
   const identity = useAuthIdentity();
   const [entryStatus, setEntryStatus] = useState<EntryStatus>(() =>
@@ -709,10 +724,51 @@ function ContextPanelDetail({
                 {recalc?.id === h.id && (
                   <p className={styles.recalcNote}>{recalc.text}</p>
                 )}
-                <p className={styles.meta}>{exactQuoteStatus(h)}</p>
-                {hasProvenance && (
-                  <p className={styles.meta}>Linked to the selected entry&apos;s source.</p>
-                )}
+
+                <div className={styles.sourceBlock}>
+                  <p className={styles.sourceTitle}>Source context</p>
+                  <p className={styles.meta}>
+                    Linked source entry:{" "}
+                    {typeLabel(entry, classification)}
+                  </p>
+                  {h.entryProvenanceType !== "none" && (
+                    <p className={styles.meta}>
+                      Source provenance:{" "}
+                      {PROVENANCE_LABELS[h.entryProvenanceType] ?? h.entryProvenanceType}
+                      {h.entryProvenanceId ? ` · ${h.entryProvenanceId}` : ""}
+                    </p>
+                  )}
+                  <p className={styles.meta}>{exactQuoteStatus(h)}</p>
+
+                  {h.quotedTextFound ? (
+                    <p className={styles.sourceExcerpt}>
+                      {locateQuote(h.entryContent, h.quotedText).map((seg, i) =>
+                        seg.match ? (
+                          <mark key={i} className={styles.sourceMark}>
+                            {seg.text}
+                          </mark>
+                        ) : (
+                          <span key={i}>{seg.text}</span>
+                        ),
+                      )}
+                    </p>
+                  ) : (
+                    <p className={styles.meta}>
+                      The source entry is linked, but its current content does not
+                      contain this exact quoted text, so no exact anchor is shown.
+                    </p>
+                  )}
+
+                  {onSelectEntry && (
+                    <button
+                      type="button"
+                      className={styles.sourceButton}
+                      onClick={() => onSelectEntry(h.entryId)}
+                    >
+                      Jump to source
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

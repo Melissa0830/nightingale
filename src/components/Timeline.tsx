@@ -5,6 +5,13 @@ import { useAuthIdentity } from "./AppShell";
 import { getToken } from "@/lib/auth-client";
 import styles from "./Timeline.module.css";
 
+// Stable per-row DOM id so a provenance "Jump to source" can scroll the
+// exact source entry into view — works for any row, in any Scenario C date
+// group (groups are always rendered, never collapsed).
+function rowDomId(entryId: string): string {
+  return `timeline-row-${entryId}`;
+}
+
 // Mirrors GET /api/patients/:id/timeline exactly (re-confirmed against
 // the current route this block): a plain array, no wrapper object, no
 // authorId, no display name anywhere on this route.
@@ -83,6 +90,10 @@ interface TimelineProps {
   // ContextPanel so this self-fetching list refetches. Optional: the Patient
   // view never mutates, so it omits this.
   refreshSignal?: number;
+  // Bumped by PatientDetailContent when a provenance "Jump to source" action
+  // asks for the currently-selected row to be scrolled into view. Separate
+  // from selectedEntryId so re-jumping to the same entry still scrolls.
+  revealSignal?: number;
 }
 
 export default function Timeline({
@@ -90,6 +101,7 @@ export default function Timeline({
   selectedEntryId,
   onSelectEntry,
   refreshSignal,
+  revealSignal,
 }: TimelineProps) {
   const identity = useAuthIdentity();
   const isPatient = identity.role === "Patient";
@@ -120,6 +132,18 @@ export default function Timeline({
       cancelled = true;
     };
   }, [patientId, refreshSignal]);
+
+  // Provenance "Jump to source": scroll the selected row into view when the
+  // reveal signal bumps. Read-only, purely presentational — no fetch, no
+  // state change. `block: "nearest"` keeps the scroll minimal; the row is
+  // reachable in any date group because groups are never collapsed.
+  useEffect(() => {
+    if (revealSignal === undefined || revealSignal === 0 || !selectedEntryId) return;
+    if (status !== "ok") return;
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(rowDomId(selectedEntryId));
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [revealSignal, selectedEntryId, status]);
 
   const heading = isPatient ? "Your Timeline" : "Longitudinal Timeline";
 
@@ -188,7 +212,7 @@ export default function Timeline({
               // versionNumber or provenance metadata, even though the
               // server already restricts which entries a Patient sees.
               return (
-                <li key={entry.id}>
+                <li key={entry.id} id={rowDomId(entry.id)}>
                   <button
                     type="button"
                     className={`${styles.row} ${styles[`row_${classification.replace(/\s/g, "")}`]} ${
