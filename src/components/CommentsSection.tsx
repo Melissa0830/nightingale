@@ -7,10 +7,10 @@ import styles from "./CommentsSection.module.css";
 
 // Mirrors GET/POST /api/timeline/:id/comments and PATCH /api/comments/:id
 // exactly (re-confirmed against the current route files this block).
-// Important correction to an assumption in the task brief: Comment has
-// NO authorRole field — only a raw authorId. There is still no generic
-// user-name/role lookup endpoint, so authorId is shown verbatim in muted
-// technical text rather than fabricating a role or name.
+// Comment has NO authorRole field — only a raw authorId, assignedToId, and
+// a mentions string[] of user ids. Those ids are resolved to display names
+// via GET /api/collaborators (same-clinic Staff/Clinician only); an id
+// that does not resolve is shown as a truthful fallback, never a guess.
 interface Comment {
   id: string;
   timelineEntryId: string;
@@ -24,7 +24,14 @@ interface Comment {
   updatedAt: string;
 }
 
+interface Collaborator {
+  id: string;
+  name: string;
+  role: "Staff" | "Clinician";
+}
+
 type Status = "loading" | "ok" | "error";
+type CollabStatus = "loading" | "ok" | "error";
 
 function formatDateTime(iso: string): string {
   const date = new Date(iso);
@@ -37,17 +44,23 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
   const identity = useAuthIdentity();
   // Confirmed from the actual routes: POST and PATCH both reject Patient
   // AND Admin (403) — only Staff/Clinician may mutate. Admin therefore
-  // gets read-only comments, no form, no Resolve/Reopen controls — never
-  // a disabled fake control.
+  // gets read-only comments, no form, no Resolve/Reopen/Assign controls.
   const canMutate = identity.role === "Clinician" || identity.role === "Staff";
 
   const [status, setStatus] = useState<Status>(() => (getToken() ? "loading" : "error"));
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
+  const [draftMentions, setDraftMentions] = useState<string[]>([]);
+  const [draftAssignee, setDraftAssignee] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [mutatingId, setMutatingId] = useState<string | null>(null);
   const [mutateError, setMutateError] = useState<string | null>(null);
+
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [collabStatus, setCollabStatus] = useState<CollabStatus>(() =>
+    getToken() ? "loading" : "error",
+  );
 
   useEffect(() => {
     const token = getToken();
@@ -74,9 +87,44 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
     };
   }, [entryId]);
 
-  // Called only from event handlers (post-mutation refresh), never from
-  // an effect body — a plain async helper, not subject to the
-  // set-state-in-effect rule.
+  // Collaborator directory is entry-independent (it is "my clinic"), but a
+  // remount per entry is cheap and keeps this component self-contained.
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+    let cancelled = false;
+    fetch(`/api/collaborators`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          setCollabStatus("error");
+          return;
+        }
+        const data = (await res.json()) as Collaborator[];
+        setCollaborators(data);
+        setCollabStatus("ok");
+      })
+      .catch(() => {
+        if (!cancelled) setCollabStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entryId]);
+
+  const collaboratorById = new Map(collaborators.map((c) => [c.id, c]));
+
+  // Truthful only: a resolved same-clinic collaborator → "Name · Role";
+  // an id that does not resolve (stale, or a role no longer eligible) →
+  // an explicit fallback, never an invented name.
+  function labelFor(userId: string | null): string {
+    if (!userId) return "Unassigned";
+    const c = collaboratorById.get(userId);
+    if (c) return `${c.name} · ${c.role}`;
+    if (collabStatus === "ok") return "Unknown collaborator";
+    return userId;
+  }
+
   async function refetchComments() {
     const token = getToken();
     if (!token) return;
@@ -87,6 +135,14 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
       const data = (await res.json()) as Comment[];
       setComments(data);
     }
+  }
+
+  function addDraftMention(userId: string) {
+    if (!userId) return;
+    setDraftMentions((prev) => (prev.includes(userId) ? prev : [...prev, userId]));
+  }
+  function removeDraftMention(userId: string) {
+    setDraftMentions((prev) => prev.filter((id) => id !== userId));
   }
 
   async function handleAddComment(e: React.FormEvent) {
@@ -102,16 +158,26 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
       return;
     }
     try {
+      const payload: {
+        content: string;
+        mentions?: string[];
+        assignedToId?: string;
+      } = { content: trimmed };
+      if (draftMentions.length > 0) payload.mentions = draftMentions;
+      if (draftAssignee) payload.assignedToId = draftAssignee;
+
       const res = await fetch(`/api/timeline/${entryId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ content: trimmed }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         setSubmitError("Unable to add comment.");
         return;
       }
       setDraft("");
+      setDraftMentions([]);
+      setDraftAssignee("");
       await refetchComments();
     } catch {
       setSubmitError("Unable to add comment.");
@@ -120,8 +186,8 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
     }
   }
 
-  async function handleToggleResolve(comment: Comment) {
-    setMutatingId(comment.id);
+  async function patchComment(commentId: string, body: Record<string, unknown>) {
+    setMutatingId(commentId);
     setMutateError(null);
     const token = getToken();
     if (!token) {
@@ -130,10 +196,10 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
       return;
     }
     try {
-      const res = await fetch(`/api/comments/${comment.id}`, {
+      const res = await fetch(`/api/comments/${commentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ resolved: !comment.resolved }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         setMutateError("Unable to update comment.");
@@ -167,34 +233,63 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
   }
 
   // Backend guarantees createdAt-ascending ordering (confirmed from the
-  // route); presentation groups Open before Resolved without re-sorting
-  // within each group.
+  // route); presentation groups Open before Resolved without re-sorting.
   const open = comments.filter((c) => !c.resolved);
   const resolved = comments.filter((c) => c.resolved);
+  const unselectedCollaborators = collaborators.filter((c) => !draftMentions.includes(c.id));
 
   function renderComment(comment: Comment) {
+    const busy = mutatingId === comment.id;
     return (
       <li key={comment.id} className={styles.item}>
-        <p className={styles.author}>{comment.authorId}</p>
+        <p className={styles.author}>{labelFor(comment.authorId)}</p>
         <p className={styles.content}>{comment.content}</p>
+        {comment.mentions.length > 0 && (
+          <p className={styles.meta}>
+            Mentioned: {comment.mentions.map((id) => labelFor(id)).join(" · ")}
+          </p>
+        )}
         <p className={styles.meta}>
-          {formatDateTime(comment.createdAt)}
-          {comment.assignedToId ? ` · Assigned to: ${comment.assignedToId}` : ""}
+          {formatDateTime(comment.createdAt)} ·{" "}
+          {comment.assignedToId
+            ? `Assigned to: ${labelFor(comment.assignedToId)}`
+            : "Unassigned"}
         </p>
         <p className={styles.status}>{comment.resolved ? "Resolved" : "Open"}</p>
+
         {canMutate && (
-          <button
-            type="button"
-            className={styles.resolveButton}
-            disabled={mutatingId === comment.id}
-            onClick={() => handleToggleResolve(comment)}
-          >
-            {mutatingId === comment.id
-              ? "Updating…"
-              : comment.resolved
-                ? "Reopen"
-                : "Resolve"}
-          </button>
+          <div className={styles.commentActions}>
+            <label className={styles.assignControl}>
+              <span className={styles.assignLabel}>Assign to</span>
+              <select
+                className={styles.select}
+                value={comment.assignedToId ?? ""}
+                disabled={busy || collabStatus !== "ok"}
+                onChange={(e) =>
+                  patchComment(comment.id, {
+                    assignedToId: e.target.value === "" ? null : e.target.value,
+                  })
+                }
+              >
+                <option value="">Unassigned</option>
+                {collaborators.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {c.role}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className={styles.resolveButton}
+              disabled={busy}
+              onClick={() =>
+                patchComment(comment.id, { resolved: !comment.resolved })
+              }
+            >
+              {busy ? "Updating…" : comment.resolved ? "Reopen" : "Resolve"}
+            </button>
+          </div>
         )}
       </li>
     );
@@ -208,9 +303,7 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
 
       {comments.length === 0 && <p className={styles.state}>No comments yet.</p>}
 
-      {open.length > 0 && (
-        <ul className={styles.list}>{open.map(renderComment)}</ul>
-      )}
+      {open.length > 0 && <ul className={styles.list}>{open.map(renderComment)}</ul>}
 
       {resolved.length > 0 && (
         <>
@@ -233,6 +326,73 @@ export default function CommentsSection({ entryId }: { entryId: string }) {
             onChange={(e) => setDraft(e.target.value)}
             rows={3}
           />
+
+          <div className={styles.composerRow}>
+            <label htmlFor="mention-select" className={styles.assignLabel}>
+              Mention
+            </label>
+            {collabStatus === "error" ? (
+              <span className={styles.state}>Collaborator list unavailable.</span>
+            ) : (
+              <select
+                id="mention-select"
+                className={styles.select}
+                value=""
+                disabled={collabStatus !== "ok" || unselectedCollaborators.length === 0}
+                onChange={(e) => {
+                  addDraftMention(e.target.value);
+                  e.currentTarget.selectedIndex = 0;
+                }}
+              >
+                <option value="">
+                  {collabStatus === "loading" ? "Loading…" : "Add person…"}
+                </option>
+                {unselectedCollaborators.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {c.role}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          {draftMentions.length > 0 && (
+            <ul className={styles.chipRow}>
+              {draftMentions.map((id) => (
+                <li key={id} className={styles.chip}>
+                  <span>{labelFor(id)}</span>
+                  <button
+                    type="button"
+                    className={styles.chipRemove}
+                    aria-label={`Remove mention ${labelFor(id)}`}
+                    onClick={() => removeDraftMention(id)}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className={styles.composerRow}>
+            <label htmlFor="assign-select" className={styles.assignLabel}>
+              Assign to
+            </label>
+            <select
+              id="assign-select"
+              className={styles.select}
+              value={draftAssignee}
+              disabled={collabStatus !== "ok"}
+              onChange={(e) => setDraftAssignee(e.target.value)}
+            >
+              <option value="">Unassigned</option>
+              {collaborators.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {c.role}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             type="submit"
             className={styles.submitButton}
