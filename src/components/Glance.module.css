@@ -1,0 +1,142 @@
+.state {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.glance {
+  margin-bottom: var(--space-6);
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.block {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+.primary {
+  border-color: var(--color-border);
+}
+
+.blockTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.subnote {
+  margin-top: var(--space-2);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* Critical Risks */
+.riskList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.riskItem {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid #d97706;
+  border-radius: var(--radius);
+  background: #fffbeb;
+}
+
+.riskLabel {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #92400e;
+  margin-bottom: var(--space-1);
+}
+
+.riskQuote {
+  font-size: 13px;
+  color: var(--color-text);
+  font-style: italic;
+}
+
+.riskReason {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* Open Actions */
+.actionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+}
+
+.actionItem {
+  font-size: 13px;
+  color: var(--color-text);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.actionItem:last-child {
+  border-bottom: none;
+}
+
+/* Recent Changes */
+.changeList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+.changeItem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.changeTime {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* Last Update */
+.lastUpdate {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

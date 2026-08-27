@@ -2,8 +2,9 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import AppShell from "@/components/AppShell";
+import AppShell, { useAuthIdentity } from "@/components/AppShell";
 import PatientHeader, { type PatientSummary } from "@/components/PatientHeader";
+import Glance from "@/components/Glance";
 import { getToken, clearToken } from "@/lib/auth-client";
 import styles from "./patient-detail.module.css";
 
@@ -28,6 +29,7 @@ export default function PatientDetailPage({
 // into fake patient content.
 function PatientDetailContent({ patientId }: { patientId: string }) {
   const router = useRouter();
+  const identity = useAuthIdentity();
   const [status, setStatus] = useState<Status>("loading");
   const [patient, setPatient] = useState<PatientSummary | null>(null);
 
@@ -89,13 +91,26 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
     return <p className={styles.state}>Something went wrong loading this patient.</p>;
   }
 
+  // Glance is fetched only for non-Patient roles, and replaces the Block 2
+  // placeholder for them entirely. Patient never sees it — matching the
+  // server's own 403 for that role on this route (see
+  // src/app/api/patients/[id]/glance/route.ts) — so no fetch is even
+  // attempted here rather than fetching and hiding the result; Patient
+  // keeps the placeholder until a Patient-safe view arrives in a later
+  // block.
   return (
     <div>
       <PatientHeader patient={patient} />
-      <p className={styles.placeholder}>Patient workspace</p>
-      <p className={styles.placeholderSub}>
-        More clinical context will appear in later blocks.
-      </p>
+      {identity.role !== "Patient" ? (
+        <Glance patientId={patientId} />
+      ) : (
+        <>
+          <p className={styles.placeholder}>Patient workspace</p>
+          <p className={styles.placeholderSub}>
+            More clinical context will appear in later blocks.
+          </p>
+        </>
+      )}
     </div>
   );
 }
