@@ -8,12 +8,15 @@ commit above. UI files were read only to identify user-triggered entry points.
 ## Architecture evidence boundary
 
 This diagram is derived from the final Prisma schema, API routes, authorization guards, and
-implementation code at the recorded application commit. It represents **implemented components,
-persisted relationships, and code-level data flows**. It does **not**, by itself, assert that every
-illustrated user-triggered interaction has been independently browser-verified end to end.
-Browser-dependent interaction paths are verified separately during **SC10 Demo Rehearsal**, before
-SC11 recording. Nodes/edges that depend on unobserved browser interaction are tagged
-`browser-pending SC10`.
+implementation code at the recorded application commit. Implemented components, persisted
+relationships, and code-level data flows are **code/schema verified**.
+
+The user has **manually browser-verified** the final SC4.x interaction paths (functional
+verification). **Independent assistant browser automation was unavailable and is not claimed** — no
+automated end-to-end evidence exists. **SC10** remains the structured demo rehearsal and final
+interaction reconfirmation step before SC11 recording; it is not first-time functional QA.
+
+Interaction nodes/edges are tagged `USER-MANUAL-BROWSER-VERIFIED · SC10-REHEARSAL-PENDING`.
 
 ## Legend
 
@@ -22,15 +25,18 @@ SC11 recording. Nodes/edges that depend on unobserved browser interaction are ta
 | Solid arrow `-->` | Implemented request path or persisted write/read |
 | Dashed arrow `-.->` | Derived / read-time computation (nothing persisted) |
 | Subgraph box | A layer or an authorization / security boundary |
-| `browser-pending SC10` | Code path exists and is route/library-verified; the user-triggered browser interaction has **not** yet been independently confirmed |
+| `CODE / SCHEMA VERIFIED` | Implementation fact confirmed from the repository at the recorded commit |
+| `USER-MANUAL-BROWSER-VERIFIED` | The user reports having manually exercised this final browser behavior (functional verification); the assistant did not independently observe it |
+| `ASSISTANT-BROWSER-NOT-INDEPENDENTLY-OBSERVED` | No assistant browser-automation evidence exists for this path |
+| `SC10-REHEARSAL-PENDING` | Path must still be rehearsed and reconfirmed in SC10 immediately before SC11 recording |
 
 ```mermaid
 flowchart TB
   subgraph CLIENT["CLIENT / BROWSER — untrusted"]
     direction TB
-    LOGIN["Login page<br/>POST /api/auth/login, then role-based redirect<br/>(browser-pending SC10)"]
+    LOGIN["Login page<br/>POST /api/auth/login, then role-based redirect<br/>user-manual-browser-verified; SC10-rehearsal-pending"]
     SHELL["AppShell auth gate<br/>GET /api/auth/me on load; RoleNav to /patients or own record"]
-    WORK["Patient Workspace<br/>Glance · Longitudinal Timeline · Context · Comments · Version History<br/>Clinician: Accept / Reject highlight — (browser-pending SC10)"]
+    WORK["Patient Workspace<br/>Glance · Longitudinal Timeline · Context · Comments · Version History<br/>Clinician: Accept / Reject highlight — user-manual-browser-verified; SC10-rehearsal-pending"]
     PSAFE["Patient reduced view<br/>server-filtered patient-visible timeline only;<br/>no Glance / Context / Comments"]
   end
 
@@ -114,11 +120,13 @@ request body; frontend visibility is convenience only. Glance and adaptive-prior
 **derived at read time** and are never persisted. `MockLlmAdapter` is local and deterministic and
 makes no network call. In the AI Scribe path, `redactPHI()` runs **before** the adapter and the raw
 transcript is never persisted or logged. Writes use an optimistic-concurrency invariant: a stale
-`expectedVersion` is rejected with HTTP 409 and leaves no `Version` row. Browser-dependent
-interactions (login/patient redirects, Recent Changes and Open Actions click-through, selected-entry
-to Context sync, comment add/mention/assign/resolve/reopen, version diff and revert, adaptive
-Accept/Reject and the recalculation message, and the Patient-safe rendered view) are code-verified
-only and are confirmed in **SC10**.
+`expectedVersion` is rejected with HTTP 409 and leaves no `Version` row. The interaction paths
+(login/patient redirects, Recent Changes and Open Actions click-through, selected-entry to Context
+sync, comment add/mention/assign/resolve/reopen, version diff and revert, adaptive Accept/Reject and
+the recalculation message, absence of the removed "Jump to source" control, and the Patient-safe
+rendered view) are **code/schema verified** and **user-manual-browser-verified** (functional); they
+are **not** independently automated-E2E verified. **SC10** rehearses and reconfirms them before
+recording.
 
 ## Flow notes (per-boundary, evidence-tagged)
 
@@ -127,7 +135,8 @@ Real final surfaces only: Login, `AppShell` (auth gate + `RoleNav`), the Patient
 (`Glance`, `Timeline`, `ContextPanel`, `CommentsSection`, `VersionHistory`, and Clinician-only
 highlight Accept/Reject), and the Patient reduced view. There is **no** real-time sync, **no**
 notifications, **no** Patient AI chat, and **no** generic Admin console. *(UI-ENTRY-POINT-VERIFIED;
-interaction paths BROWSER-PENDING-SC10.)*
+interaction paths USER-MANUAL-BROWSER-VERIFIED, ASSISTANT-BROWSER-NOT-INDEPENDENTLY-OBSERVED,
+SC10-REHEARSAL-PENDING.)*
 
 ### Auth / security boundary
 `Authorization: Bearer <JWT>` → `authenticate()` (HS256-only verify; `JWT_SECRET` from env) →
@@ -159,8 +168,8 @@ The critical risk floor uses exactly `anaphylaxis`, `chest pain`, `difficulty br
 (`GET /api/collaborators` supplies the picker). `resolved = false` comments feed Glance Open Actions.
 `Comment.parentId` exists in the schema and the API stores it, **but the rendered UI is flat
 entry-level** — no threaded reply tree, no reply composer, and **no notification delivery**.
-*(SCHEMA-VERIFIED, ROUTE-VERIFIED, TEST-SUPPORTED — `test_comment_collaboration.py`; rendering
-BROWSER-PENDING-SC10.)*
+*(SCHEMA-VERIFIED, ROUTE-VERIFIED, TEST-SUPPORTED — `test_comment_collaboration.py`; flat rendering
+USER-MANUAL-BROWSER-VERIFIED, ASSISTANT-BROWSER-NOT-INDEPENDENTLY-OBSERVED, SC10-REHEARSAL-PENDING.)*
 
 ### AI Scribe
 `Staff / Clinician` → `POST /api/patients/:id/ai-scribe` → `authenticate` + `assertPatientAccess`
@@ -232,10 +241,15 @@ Medication / ChiefComplaint models or clinical-entity tagging; recency-weighted 
 temporal data-decay implementation; voice capture / speech transcription / diarization;
 `GET /api/patients` list service; `GET /api/timeline/:id/changes?since=`; auto-merge / CRDT engine.
 
-## SC10 reopen dependency
+## SC10 role and reopen dependency
 
-If SC10 browser behavior materially contradicts an interaction path in this diagram: determine
-whether the discrepancy is UI-only. If UI-only, do **not** redraw the schema. If it changes an
+SC10 is the structured demo rehearsal: presentation-order rehearsal, final-state reconfirmation,
+mutation/reseed choreography check, and pre-recording guard. It is **not** the first browser
+verification — the user has already manually verified the SC4.x interaction paths functionally.
+
+If SC10 (or any later observation) reveals behavior materially inconsistent with a documented
+interaction path or a prior user-observed result: STOP that affected path. Determine whether the
+discrepancy is UI-only. If UI-only, do **not** redraw the schema (Diagram 2). If it changes an
 actually-implemented data flow, reopen **only** the affected annotation/arrow here, plus the
 matching SC4.F truth-boundary verdict and SC5 claim-evidence row; do not invalidate unrelated
-architecture. SC11 recording cannot proceed until the discrepancy is reconciled.
+closure work. SC11 recording cannot proceed until the discrepancy is reconciled.
