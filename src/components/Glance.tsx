@@ -82,6 +82,19 @@ function describeEntry(entry: RecentChange): string {
   return `${section ?? "Entry"} updated`;
 }
 
+// One short, literal preview of an entry's current content for its Recent
+// Changes row: inline whitespace collapsed, then hard-truncated to a single
+// short line. This is a slice of the real `content` already in the Glance
+// payload — no summary, no reordering, no rephrasing, no LLM. Returns "" when
+// there is nothing printable, so the caller omits the preview line entirely.
+const PREVIEW_MAX_CHARS = 110;
+function previewContent(content: string): string {
+  const flattened = content.replace(/\s+/g, " ").trim();
+  if (!flattened) return "";
+  if (flattened.length <= PREVIEW_MAX_CHARS) return flattened;
+  return `${flattened.slice(0, PREVIEW_MAX_CHARS - 1).trimEnd()}…`;
+}
+
 export default function Glance({
   patientId,
   // Monotonic integer owned by the patient workspace. It is bumped ONLY
@@ -231,29 +244,37 @@ export default function Glance({
             <p className={styles.empty}>No recent changes.</p>
           ) : (
             <ul className={styles.changeList}>
-              {recentChanges.map((c) =>
-                onSelectEntry ? (
-                  <li key={c.entryId}>
-                    <button
-                      type="button"
-                      className={`${styles.changeItem} ${styles.changeButton}`}
-                      onClick={() => onSelectEntry(c.entryId)}
-                    >
+              {recentChanges.map((c) => {
+                const preview = previewContent(c.content);
+                const head = (
+                  <>
+                    <span className={styles.changeHead}>
                       <span>{describeEntry(c)}</span>
                       <span className={styles.changeTime}>
                         {formatRelative(c.updatedAt)}
                       </span>
+                    </span>
+                    {preview && (
+                      <span className={styles.changePreview}>{preview}</span>
+                    )}
+                  </>
+                );
+                return onSelectEntry ? (
+                  <li key={c.entryId}>
+                    <button
+                      type="button"
+                      className={`${styles.change} ${styles.changeButton}`}
+                      onClick={() => onSelectEntry(c.entryId)}
+                    >
+                      {head}
                     </button>
                   </li>
                 ) : (
-                  <li key={c.entryId} className={styles.changeItem}>
-                    <span>{describeEntry(c)}</span>
-                    <span className={styles.changeTime}>
-                      {formatRelative(c.updatedAt)}
-                    </span>
+                  <li key={c.entryId} className={styles.change}>
+                    {head}
                   </li>
-                ),
-              )}
+                );
+              })}
             </ul>
           )}
         </div>
