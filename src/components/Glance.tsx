@@ -94,9 +94,15 @@ export default function Glance({
   // an AbortController. Assignment-only, mention, Highlight-feedback, and
   // every read-only action never touch this key.
   refreshKey = 0,
+  // Optional: makes each Recent Changes row a navigation control that
+  // selects the corresponding Timeline entry (by the `entryId` already in
+  // the response) and reveals it — equivalent to clicking that Timeline
+  // row directly. No new state, no API change.
+  onSelectEntry,
 }: {
   patientId: string;
   refreshKey?: number;
+  onSelectEntry?: (entryId: string) => void;
 }) {
   // Lazy initializer, not a setState-in-effect: if there's no token at
   // mount, status starts (and stays) "error" without the effect ever
@@ -225,12 +231,29 @@ export default function Glance({
             <p className={styles.empty}>No recent changes.</p>
           ) : (
             <ul className={styles.changeList}>
-              {recentChanges.map((c) => (
-                <li key={c.entryId} className={styles.changeItem}>
-                  <span>{describeEntry(c)}</span>
-                  <span className={styles.changeTime}>{formatRelative(c.updatedAt)}</span>
-                </li>
-              ))}
+              {recentChanges.map((c) =>
+                onSelectEntry ? (
+                  <li key={c.entryId}>
+                    <button
+                      type="button"
+                      className={`${styles.changeItem} ${styles.changeButton}`}
+                      onClick={() => onSelectEntry(c.entryId)}
+                    >
+                      <span>{describeEntry(c)}</span>
+                      <span className={styles.changeTime}>
+                        {formatRelative(c.updatedAt)}
+                      </span>
+                    </button>
+                  </li>
+                ) : (
+                  <li key={c.entryId} className={styles.changeItem}>
+                    <span>{describeEntry(c)}</span>
+                    <span className={styles.changeTime}>
+                      {formatRelative(c.updatedAt)}
+                    </span>
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </div>

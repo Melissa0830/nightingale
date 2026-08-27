@@ -53,6 +53,17 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
   const [glanceRefreshKey, setGlanceRefreshKey] = useState(0);
   const bumpGlance = () => setGlanceRefreshKey((k) => k + 1);
 
+  // Select a Timeline entry and ask the Timeline to scroll it into view.
+  // Shared by provenance "View source" and Recent Changes click-through so
+  // both behave exactly like a direct Timeline row click: selectedEntryId
+  // moves (never to null, so the Context panel swaps content in place with
+  // no close/reopen), and revealNonce bumps so re-selecting the same id
+  // still scrolls. No new state — reuses the one selected-entry model.
+  const revealEntry = (id: string) => {
+    setSelectedEntryId(id);
+    setRevealNonce((n) => n + 1);
+  };
+
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -125,7 +136,11 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
     <div>
       <PatientHeader patient={patient} />
       {identity.role !== "Patient" && (
-        <Glance patientId={patientId} refreshKey={glanceRefreshKey} />
+        <Glance
+          patientId={patientId}
+          refreshKey={glanceRefreshKey}
+          onSelectEntry={revealEntry}
+        />
       )}
       {identity.role !== "Patient" ? (
         <div
@@ -159,10 +174,7 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
                 bumpGlance();
               }}
               onGlanceRelevantMutation={bumpGlance}
-              onSelectEntry={(id) => {
-                setSelectedEntryId(id);
-                setRevealNonce((n) => n + 1);
-              }}
+              onSelectEntry={revealEntry}
             />
           )}
         </div>

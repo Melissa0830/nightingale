@@ -93,8 +93,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               className={styles.navToggle}
-              aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+              aria-label={navCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-expanded={!navCollapsed}
+              title={navCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               onClick={() => setNavCollapsed((c) => !c)}
             >
               {navCollapsed ? "»" : "«"}
