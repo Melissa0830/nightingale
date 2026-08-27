@@ -11,9 +11,20 @@ import styles from "./patients.module.css";
 // navigation shim over the known seeded fixture IDs from prisma/seed.ts,
 // not a real patient directory. The server (GET /api/patients/:id) remains
 // the actual access-control boundary regardless of what this list shows.
-const DEMO_PATIENTS = [
+const DEMO_PATIENTS: {
+  id: string;
+  clinicId: string;
+  label: string;
+  tag?: string;
+}[] = [
   { id: "synthetic-patient-a", clinicId: "synthetic-clinic-a", label: "Synthetic Patient A" },
   { id: "synthetic-patient-b", clinicId: "synthetic-clinic-b", label: "Synthetic Patient B" },
+  {
+    id: "synthetic-patient-learning",
+    clinicId: "synthetic-clinic-a",
+    label: "Synthetic Learning Patient",
+    tag: "Adaptive prioritization demo",
+  },
 ];
 
 export default function PatientsPage() {
@@ -60,7 +71,7 @@ function PatientsSelector() {
             <li key={p.id} className={styles.item}>
               <div>
                 <p className={styles.name}>{p.label}</p>
-                <p className={styles.tag}>Demo record</p>
+                <p className={styles.tag}>{p.tag ?? "Demo record"}</p>
               </div>
               <Link href={`/patients/${p.id}`} className={styles.open}>
                 Open patient

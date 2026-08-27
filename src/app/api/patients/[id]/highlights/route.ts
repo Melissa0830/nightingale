@@ -3,6 +3,10 @@ import { assertPatientAccess } from "@/lib/auth/clinic-scope";
 import { isPatientVisibleEntry } from "@/lib/auth/patient-filter";
 import { ApiError, toErrorResponse } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import {
+  deriveAdaptivePriority,
+  normalizeRiskReason,
+} from "@/lib/highlights/derive-adaptive-priority";
 
 // Exact, case-sensitive substring occurrence count — no normalization,
 // no regex, no dependency. Mirrors the deliberate "quotedText string
@@ -76,9 +80,48 @@ export async function GET(
         ? highlights.filter((h) => isPatientVisibleEntry({ type: h.entry.type }))
         : highlights;
 
+    // ─── Feedback-Informed Adaptive Highlight Prioritization (Bonus) ──────
+    // Read-time derivation only — nothing below is persisted, and no existing
+    // field's meaning changes. `importance` stays the base importance.
+    //
+    // Aggregation scope: all NON-PENDING (accepted/rejected) Highlights in
+    // the SAME CLINIC as this patient, grouped by normalized riskReason.
+    // Clinic scope comes from patient.clinicId (DB-derived) — Clinic A
+    // feedback can never reach Clinic B and vice versa. `pending` never
+    // contributes to the threshold. Every persisted non-pending Highlight in
+    // the clinic+bucket participates, including the current Highlight's own
+    // feedback when it is accepted/rejected — a pending target is adjusted
+    // purely by prior feedback on the same recurring pattern.
+    const clinicFeedbackRows = await prisma.highlight.findMany({
+      where: {
+        feedback: { in: ["accepted", "rejected"] },
+        patient: { clinicId: patient.clinicId },
+      },
+      select: { riskReason: true, feedback: true },
+    });
+
+    const bucketCounts = new Map<string, { accepted: number; rejected: number }>();
+    for (const row of clinicFeedbackRows) {
+      const key = normalizeRiskReason(row.riskReason);
+      const bucket = bucketCounts.get(key) ?? { accepted: 0, rejected: 0 };
+      if (row.feedback === "accepted") bucket.accepted += 1;
+      else bucket.rejected += 1;
+      bucketCounts.set(key, bucket);
+    }
+
     const response = visibleHighlights.map((h) => {
       const content = h.entry.content;
       const occurrenceCount = countOccurrences(content, h.quotedText);
+
+      const bucket = bucketCounts.get(normalizeRiskReason(h.riskReason)) ?? {
+        accepted: 0,
+        rejected: 0,
+      };
+      const adaptive = deriveAdaptivePriority({
+        baseImportance: h.importance,
+        acceptedCount: bucket.accepted,
+        rejectedCount: bucket.rejected,
+      });
 
       return {
         id: h.id,
@@ -94,6 +137,12 @@ export async function GET(
         entryContent: content,
         entryProvenanceType: h.entry.provenanceType,
         entryProvenanceId: h.entry.provenanceId,
+        // Derived, non-persisted adaptive prioritization fields.
+        acceptedCount: adaptive.acceptedCount,
+        rejectedCount: adaptive.rejectedCount,
+        feedbackCount: adaptive.feedbackCount,
+        learnedAdjustment: adaptive.learnedAdjustment,
+        effectiveImportance: adaptive.effectiveImportance,
       };
     });
 

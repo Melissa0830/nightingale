@@ -26,7 +26,10 @@ interface EntryDetail {
 // Mirrors GET /api/patients/:id/highlights exactly (re-confirmed this
 // block) — no riskFloor anywhere on this route; quotedTextFound/
 // occurrenceCount are server-computed and used verbatim, never
-// recomputed here.
+// recomputed here. The adaptive* fields are the Bonus read-time
+// derivation: importance stays the base importance, effectiveImportance =
+// importance + learnedAdjustment, counts are same-clinic same-normalized-
+// riskReason accept/reject totals. Nothing here is recomputed client-side.
 interface Highlight {
   id: string;
   patientId: string;
@@ -41,6 +44,11 @@ interface Highlight {
   entryContent: string;
   entryProvenanceType: string;
   entryProvenanceId: string | null;
+  acceptedCount: number;
+  rejectedCount: number;
+  feedbackCount: number;
+  learnedAdjustment: number;
+  effectiveImportance: number;
 }
 
 type EntryStatus = "loading" | "ok" | "forbidden" | "notfound" | "error";
@@ -533,6 +541,14 @@ function ContextPanelDetail({
                 <p className={styles.quote}>&ldquo;{h.quotedText}&rdquo;</p>
                 <p className={styles.reason}>{h.riskReason}</p>
                 <p className={styles.meta}>Importance: {h.importance}</p>
+                <p className={styles.meta}>Adaptive priority: {h.effectiveImportance}</p>
+                <p className={styles.meta}>
+                  {h.feedbackCount >= 3
+                    ? `${h.acceptedCount} accepted · ${h.rejectedCount} rejected in this clinic`
+                    : `${h.feedbackCount} prior review${
+                        h.feedbackCount === 1 ? "" : "s"
+                      } · threshold not reached`}
+                </p>
                 <div className={styles.feedbackLine}>
                   <span className={styles.meta}>Feedback: {capitalize(h.feedback)}</span>
                   {identity.role === "Clinician" && (
