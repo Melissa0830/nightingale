@@ -133,16 +133,20 @@ export default function Timeline({
     };
   }, [patientId, refreshSignal]);
 
-  // Provenance "Jump to source": scroll the selected row into view when the
-  // reveal signal bumps. Read-only, purely presentational — no fetch, no
-  // state change. `block: "nearest"` keeps the scroll minimal; the row is
-  // reachable in any date group because groups are never collapsed.
+  // External navigation into a Timeline entry (provenance "Jump to source",
+  // Recent Changes click-through) bumps the reveal signal. Scroll the target
+  // row toward the centre of the viewport so the move is visible even when
+  // the row was already partly on screen, then confirm the selection by
+  // moving focus to its button. Read-only, purely presentational — no
+  // fetch, no state change. The row is reachable in any date group because
+  // groups are never collapsed.
   useEffect(() => {
     if (revealSignal === undefined || revealSignal === 0 || !selectedEntryId) return;
     if (status !== "ok") return;
     if (typeof document === "undefined") return;
     const el = document.getElementById(rowDomId(selectedEntryId));
-    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    el?.querySelector("button")?.focus({ preventScroll: true });
   }, [revealSignal, selectedEntryId, status]);
 
   const heading = isPatient ? "Your Timeline" : "Longitudinal Timeline";
