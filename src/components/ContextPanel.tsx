@@ -189,6 +189,14 @@ function ContextPanelDetail({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [conflict, setConflict] = useState(false);
 
+  // Highlight Accept/Reject mutation state — local to this panel, keyed by
+  // the individual Highlight id so only the affected row disables/shows an
+  // error. Feedback records a clinician's decision on the Highlight signal
+  // only; it is never an approval of the underlying entry, and never touches
+  // importance or riskFloor.
+  const [updatingHighlightId, setUpdatingHighlightId] = useState<string | null>(null);
+  const [feedbackErrorId, setFeedbackErrorId] = useState<string | null>(null);
+
   useEffect(() => {
     const token = getToken();
     if (!token) return;
@@ -312,6 +320,37 @@ function ContextPanelDetail({
       setLocalRefresh((n) => n + 1);
     } catch {
       setSaveState("error");
+    }
+  }
+
+  // Clinician-only (PATCH /api/highlights/:id is 403 for every other role).
+  // Non-optimistic: disable the row's controls, PATCH, then on success reuse
+  // the Block 7 localRefresh mechanism to re-fetch the authorized Highlight
+  // list and render canonical server state. On failure keep the previous
+  // state and show a local error under that Highlight only.
+  async function handleHighlightFeedback(
+    highlightId: string,
+    feedback: "accepted" | "rejected",
+  ) {
+    const token = getToken();
+    if (!token) return;
+    setUpdatingHighlightId(highlightId);
+    setFeedbackErrorId(null);
+    try {
+      const res = await fetch(`/api/highlights/${highlightId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ feedback }),
+      });
+      if (!res.ok) {
+        setFeedbackErrorId(highlightId);
+        return;
+      }
+      setLocalRefresh((n) => n + 1);
+    } catch {
+      setFeedbackErrorId(highlightId);
+    } finally {
+      setUpdatingHighlightId(null);
     }
   }
 
@@ -494,7 +533,36 @@ function ContextPanelDetail({
                 <p className={styles.quote}>&ldquo;{h.quotedText}&rdquo;</p>
                 <p className={styles.reason}>{h.riskReason}</p>
                 <p className={styles.meta}>Importance: {h.importance}</p>
-                <p className={styles.meta}>Highlight feedback: {capitalize(h.feedback)}</p>
+                <div className={styles.feedbackLine}>
+                  <span className={styles.meta}>Feedback: {capitalize(h.feedback)}</span>
+                  {identity.role === "Clinician" && (
+                    <>
+                      {h.feedback !== "accepted" && (
+                        <button
+                          type="button"
+                          className={styles.feedbackButton}
+                          disabled={updatingHighlightId === h.id}
+                          onClick={() => handleHighlightFeedback(h.id, "accepted")}
+                        >
+                          Accept
+                        </button>
+                      )}
+                      {h.feedback !== "rejected" && (
+                        <button
+                          type="button"
+                          className={styles.feedbackButton}
+                          disabled={updatingHighlightId === h.id}
+                          onClick={() => handleHighlightFeedback(h.id, "rejected")}
+                        >
+                          Reject
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+                {feedbackErrorId === h.id && (
+                  <p className={styles.feedbackError}>Unable to update highlight feedback.</p>
+                )}
                 <p className={styles.meta}>{exactQuoteStatus(h)}</p>
                 {hasProvenance && (
                   <p className={styles.meta}>Linked to the selected entry&apos;s source.</p>
