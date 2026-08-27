@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppShell, { useAuthIdentity } from "@/components/AppShell";
 import PatientHeader, { type PatientSummary } from "@/components/PatientHeader";
@@ -134,6 +135,11 @@ function PatientDetailContent({ patientId }: { patientId: string }) {
   // Block 4, even though Patient has no ContextPanel to react to it.
   return (
     <div>
+      {identity.role !== "Patient" && (
+        <Link href="/patients" className={styles.backLink}>
+          ← Patients
+        </Link>
+      )}
       <PatientHeader patient={patient} />
       {identity.role !== "Patient" && (
         <Glance

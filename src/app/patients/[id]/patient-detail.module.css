@@ -3,6 +3,25 @@
   color: var(--color-text-muted);
 }
 
+/* Back-navigation to the Patients list — shown for internal roles only
+   (Patient has no browseable directory). Uses the existing /patients
+   route; no new navigation model. */
+.backLink {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.backLink:hover {
+  color: var(--color-accent);
+}
+
+.backLink:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 /* Default: no detail panel — the Timeline flows across the full width. */
 .workspace {
   display: block;

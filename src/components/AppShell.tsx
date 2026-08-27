@@ -28,9 +28,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [identity, setIdentity] = useState<AuthIdentity | null>(null);
   const [checking, setChecking] = useState(true);
-  // Local UI-only state: collapsing the sidebar is purely presentational —
-  // it touches no route, auth, or data state, and is not persisted.
-  const [navCollapsed, setNavCollapsed] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -75,7 +72,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={identity}>
       <div className={styles.shell}>
         <header className={styles.topbar}>
-          <span className={styles.brand}>Nightingale</span>
+          <div className={styles.topbarLeft}>
+            <span className={styles.brand}>Nightingale</span>
+            <RoleNav />
+          </div>
           <div className={styles.identity}>
             <span className={styles.roleBadge}>{identity.role}</span>
             <span className={styles.userId} title={identity.id}>
@@ -86,24 +86,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </header>
-        <div className={styles.body}>
-          <aside
-            className={`${styles.sidebar} ${navCollapsed ? styles.sidebarCollapsed : ""}`}
-          >
-            <button
-              type="button"
-              className={styles.navToggle}
-              aria-label={navCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              aria-expanded={!navCollapsed}
-              title={navCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              onClick={() => setNavCollapsed((c) => !c)}
-            >
-              {navCollapsed ? "»" : "«"}
-            </button>
-            {!navCollapsed && <RoleNav />}
-          </aside>
-          <main className={styles.content}>{children}</main>
-        </div>
+        <main className={styles.content}>{children}</main>
       </div>
     </AuthContext.Provider>
   );
