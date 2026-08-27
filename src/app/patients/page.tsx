@@ -17,13 +17,18 @@ const DEMO_PATIENTS: {
   label: string;
   tag?: string;
 }[] = [
-  { id: "synthetic-patient-a", clinicId: "synthetic-clinic-a", label: "Synthetic Patient A" },
+  {
+    id: "synthetic-patient-a",
+    clinicId: "synthetic-clinic-a",
+    label: "Synthetic Patient A",
+    tag: "Standard clinical workflow",
+  },
   { id: "synthetic-patient-b", clinicId: "synthetic-clinic-b", label: "Synthetic Patient B" },
   {
     id: "synthetic-patient-learning",
     clinicId: "synthetic-clinic-a",
     label: "Synthetic Learning Patient",
-    tag: "Adaptive prioritization demo",
+    tag: "Full workflow with adaptive prioritization",
   },
 ];
 

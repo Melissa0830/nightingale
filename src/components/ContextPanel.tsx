@@ -627,6 +627,13 @@ function ContextPanelDetail({
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Highlights</h3>
+        {highlightsStatus === "ok" && highlights.length > 0 && (
+          <p className={styles.boundaryNote}>
+            Adaptive priority affects review ordering, not clinical severity.
+            Accept / Reject records whether a highlight suggestion is worth
+            surfacing — not whether it is medically correct.
+          </p>
+        )}
         {highlightsStatus === "loading" && (
           <p className={styles.state} role="status">
             Loading highlights…

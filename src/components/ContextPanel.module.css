@@ -136,6 +136,12 @@
   color: var(--color-text);
 }
 
+.boundaryNote {
+  margin-bottom: var(--space-3);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 .feedbackLine {
   margin-top: var(--space-2);
   display: flex;
