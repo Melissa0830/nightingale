@@ -125,6 +125,13 @@
   color: var(--color-text-muted);
 }
 
+.recalcNote {
+  margin-top: var(--space-1);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
 .feedbackLine {
   margin-top: var(--space-2);
   display: flex;

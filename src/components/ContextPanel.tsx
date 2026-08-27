@@ -251,6 +251,14 @@ function ContextPanelDetail({
   // importance or riskFloor.
   const [updatingHighlightId, setUpdatingHighlightId] = useState<string | null>(null);
   const [feedbackErrorId, setFeedbackErrorId] = useState<string | null>(null);
+  // PATCH succeeded but the confirming re-fetch failed — feedback is saved,
+  // but we must NOT fabricate a new adaptive score. Keyed by Highlight id.
+  const [refreshErrorId, setRefreshErrorId] = useState<string | null>(null);
+  // Server-confirmed recalculation result, shown after a successful
+  // Accept/Reject + fresh GET. Never computed optimistically. Keyed by
+  // Highlight id; cleared on entry switch (component is keyed by entryId)
+  // and at the start of the next feedback mutation.
+  const [recalc, setRecalc] = useState<{ id: string; text: string } | null>(null);
 
   useEffect(() => {
     const token = getToken();
@@ -379,18 +387,24 @@ function ContextPanelDetail({
   }
 
   // Clinician-only (PATCH /api/highlights/:id is 403 for every other role).
-  // Non-optimistic: disable the row's controls, PATCH, then on success reuse
-  // the Block 7 localRefresh mechanism to re-fetch the authorized Highlight
-  // list and render canonical server state. On failure keep the previous
-  // state and show a local error under that Highlight only.
+  // Non-optimistic + server-confirmed: capture the current server-derived
+  // effectiveImportance, PATCH the feedback, then do a fresh GET and read the
+  // NEW server-derived value. The recalculation message compares old vs new;
+  // the client never invents the new score.
+  //   - denied PATCH  -> feedback error only, no recalculation state
+  //   - PATCH ok but the confirming GET fails -> "saved, could not refresh"
+  //     and NO fabricated score
   async function handleHighlightFeedback(
     highlightId: string,
     feedback: "accepted" | "rejected",
   ) {
     const token = getToken();
     if (!token) return;
+    const before = highlights.find((h) => h.id === highlightId)?.effectiveImportance;
     setUpdatingHighlightId(highlightId);
     setFeedbackErrorId(null);
+    setRefreshErrorId(null);
+    setRecalc(null);
     try {
       const res = await fetch(`/api/highlights/${highlightId}`, {
         method: "PATCH",
@@ -401,7 +415,36 @@ function ContextPanelDetail({
         setFeedbackErrorId(highlightId);
         return;
       }
-      setLocalRefresh((n) => n + 1);
+
+      // Server-confirmed refresh — the only source of the new score.
+      let fresh: Highlight[];
+      try {
+        const refetch = await fetch(`/api/patients/${patientId}/highlights`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!refetch.ok) {
+          setRefreshErrorId(highlightId);
+          return;
+        }
+        fresh = (await refetch.json()) as Highlight[];
+      } catch {
+        setRefreshErrorId(highlightId);
+        return;
+      }
+
+      setHighlights(fresh.filter((h) => h.entryId === entryId));
+      const after = fresh.find((h) => h.id === highlightId)?.effectiveImportance;
+      if (after === undefined) {
+        setRefreshErrorId(highlightId);
+        return;
+      }
+      setRecalc({
+        id: highlightId,
+        text:
+          before !== undefined && after !== before
+            ? `Adaptive priority recalculated: ${before} → ${after}`
+            : "Feedback saved. Adaptive priority unchanged.",
+      });
     } catch {
       setFeedbackErrorId(highlightId);
     } finally {
@@ -633,6 +676,15 @@ function ContextPanelDetail({
                 </div>
                 {feedbackErrorId === h.id && (
                   <p className={styles.feedbackError}>Unable to update highlight feedback.</p>
+                )}
+                {refreshErrorId === h.id && (
+                  <p className={styles.feedbackError}>
+                    Feedback saved, but the panel could not refresh. Reload to see the
+                    updated adaptive priority.
+                  </p>
+                )}
+                {recalc?.id === h.id && (
+                  <p className={styles.recalcNote}>{recalc.text}</p>
                 )}
                 <p className={styles.meta}>{exactQuoteStatus(h)}</p>
                 {hasProvenance && (

@@ -52,6 +52,7 @@ PATIENT_LEARNING_B = "synthetic-patient-learning-b"
 PATIENT_A = "synthetic-patient-a"
 
 HL_X_A = "synthetic-highlight-learning-x-a"
+HL_Y_E = "synthetic-highlight-learning-y-e"
 HL_X_D = "synthetic-highlight-learning-x-d"
 HL_Y_G = "synthetic-highlight-learning-y-g"
 HL_XB_D = "synthetic-highlight-learning-xb-d"
@@ -227,6 +228,105 @@ def run_tests():
         and pa_ai.get("feedbackCount") == 0
         and pa_ai.get("learnedAdjustment") == 0
         and pa_ai.get("effectiveImportance") == 0,
+    )
+
+    # ─── Patient role receives NO adaptive / riskFloor metadata ──────────
+    status, rows_patient = get_highlights("patient_a", PATIENT_A)
+    patient_shape_ok = (
+        status == 200
+        and isinstance(rows_patient, list)
+        and len(rows_patient) == 1
+        and all(
+            k not in rows_patient[0]
+            for k in (
+                "riskFloor",
+                "acceptedCount",
+                "rejectedCount",
+                "feedbackCount",
+                "reviewCount",
+                "acceptanceRate",
+                "learningStatus",
+                "learnedAdjustment",
+                "effectiveImportance",
+                "matchMethod",
+                "lexicalOverlapScore",
+            )
+        )
+    )
+    check("E3. Patient role highlight payload carries no adaptive/riskFloor fields", patient_shape_ok)
+
+    # ─── Phase 8: server-confirmed live recalculation + PATCH self-restore ─
+    token_a = login("clinician_a")
+
+    def xd_effective():
+        s, rows = get_highlights("clinician_a", PATIENT_LEARNING)
+        h = find(rows, HL_X_D) if isinstance(rows, list) else None
+        return h.get("effectiveImportance") if h else None, h
+
+    before_eff, before_h = xd_effective()
+    check(
+        "F0. bucket X pending target starts at effectiveImportance +2 "
+        "(3 accepted / 0 rejected)",
+        before_eff == 2 and before_h and before_h.get("acceptedCount") == 3
+        and before_h.get("rejectedCount") == 0,
+    )
+
+    # flip one historical accept -> reject
+    s_flip, _ = _http_json(
+        "PATCH", f"/api/highlights/{HL_X_A}", token=token_a, body={"feedback": "rejected"}
+    )
+    mid_eff, mid_h = xd_effective()
+    check(
+        "F1. after flipping one accepted -> rejected, fresh GET shows "
+        "2 accepted / 1 rejected / +1 (server recalculated, not client-guessed)",
+        s_flip == 200
+        and mid_h
+        and mid_h.get("acceptedCount") == 2
+        and mid_h.get("rejectedCount") == 1
+        and mid_h.get("learnedAdjustment") == 1
+        and mid_eff == 1,
+    )
+    check("F2. recalculation message would read '2 -> 1' (before != after)", before_eff == 2 and mid_eff == 1)
+
+    # restore via PATCH (accepted <-> rejected is reversible; no reseed needed)
+    s_restore, _ = _http_json(
+        "PATCH", f"/api/highlights/{HL_X_A}", token=token_a, body={"feedback": "accepted"}
+    )
+    after_eff, after_h = xd_effective()
+    check(
+        "F3. restore accepted -> bucket X target back to 3 / 0 / +2",
+        s_restore == 200
+        and after_h
+        and after_h.get("acceptedCount") == 3
+        and after_h.get("rejectedCount") == 0
+        and after_eff == 2,
+    )
+
+    # Phase 8 test B — below threshold: a feedback change that keeps the
+    # review count under 3 must NOT move the adjustment. Flip Y_E
+    # accepted -> rejected (bucket Y: 1 accepted + 1 rejected, still 2 reviews).
+    s_ye, _ = _http_json(
+        "PATCH", f"/api/highlights/{HL_Y_E}", token=token_a, body={"feedback": "rejected"}
+    )
+    s, rows_y = get_highlights("clinician_a", PATIENT_LEARNING)
+    y_g_mid = find(rows_y, HL_Y_G) if isinstance(rows_y, list) else None
+    check(
+        "F4. below-threshold feedback change keeps reviewCount 2 and "
+        "learnedAdjustment 0 ('feedback saved, unchanged')",
+        s_ye == 200 and y_g_mid and y_g_mid.get("reviewCount") == 2
+        and y_g_mid.get("learnedAdjustment") == 0
+        and y_g_mid.get("effectiveImportance") == 0,
+    )
+    # restore Y_E rejected -> accepted (PATCH-reversible; fixture back to seed)
+    s_ye2, _ = _http_json(
+        "PATCH", f"/api/highlights/{HL_Y_E}", token=token_a, body={"feedback": "accepted"}
+    )
+    s, rows_y2 = get_highlights("clinician_a", PATIENT_LEARNING)
+    y_e_final = find(rows_y2, HL_Y_E) if isinstance(rows_y2, list) else None
+    check(
+        "F5. bucket Y restored to seeded state (Y_E accepted again, adj 0)",
+        s_ye2 == 200 and y_e_final and y_e_final.get("feedback") == "accepted"
+        and y_e_final.get("learnedAdjustment") == 0,
     )
 
     total = len(results)
