@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getToken } from "@/lib/auth-client";
+import { buildWordDiff, hasContentChanges } from "@/lib/diff/word-diff";
 import styles from "./VersionHistory.module.css";
 
 // Mirrors GET /api/timeline/:id/versions exactly (re-confirmed against the
@@ -64,6 +65,10 @@ export default function VersionHistory({
   const [confirmingVersion, setConfirmingVersion] = useState<number | null>(null);
   const [revertState, setRevertState] = useState<"idle" | "reverting" | "error">("idle");
   const [conflict, setConflict] = useState(false);
+  // Which historical version is currently being compared to the live entry.
+  // Read-only view state — comparing never calls the network (the snapshot
+  // and current content are both already in `data`) and never mutates.
+  const [comparingVersion, setComparingVersion] = useState<number | null>(null);
 
   useEffect(() => {
     const token = getToken();
@@ -151,6 +156,16 @@ export default function VersionHistory({
   // list and is never synthesised into it.
   const history = [...data.versions].sort((a, b) => b.versionNumber - a.versionNumber);
 
+  // Defensive: only honour the comparison selection if that historical
+  // version is still present after the latest refetch. Historical versions
+  // are immutable and monotonic, so this only clears on an entry switch —
+  // but the derive keeps a stale number from ever rendering a broken box.
+  const activeCompareVersion =
+    comparingVersion !== null &&
+    history.some((v) => v.versionNumber === comparingVersion)
+      ? comparingVersion
+      : null;
+
   return (
     <section className={styles.section}>
       <h3 className={styles.sectionTitle}>Version History</h3>
@@ -185,6 +200,30 @@ export default function VersionHistory({
               </p>
               <p className={styles.preview}>{v.content}</p>
               {v.editorId && <p className={styles.meta}>Editor: {v.editorId}</p>}
+
+              <button
+                type="button"
+                className={styles.compareButton}
+                aria-expanded={activeCompareVersion === v.versionNumber}
+                onClick={() =>
+                  setComparingVersion((prev) =>
+                    prev === v.versionNumber ? null : v.versionNumber,
+                  )
+                }
+              >
+                {activeCompareVersion === v.versionNumber
+                  ? "Hide changes"
+                  : `View changes since v${v.versionNumber}`}
+              </button>
+
+              {activeCompareVersion === v.versionNumber && (
+                <VersionDiff
+                  fromVersion={v.versionNumber}
+                  currentVersionNumber={data.currentVersionNumber}
+                  oldContent={v.content}
+                  currentContent={data.currentContent}
+                />
+              )}
 
               {canRevert && confirmingVersion === v.versionNumber && (
                 <div className={styles.confirmBox}>
@@ -243,5 +282,58 @@ export default function VersionHistory({
         <p className={styles.error}>Unable to revert. Check your connection and try again.</p>
       )}
     </section>
+  );
+}
+
+// Read-only word-level comparison: the selected historical snapshot →
+// the current live content. Direction is fixed (old → current): an <ins>
+// run is text the current note has that the snapshot did not; a <del> run
+// is text the snapshot had that the current note dropped. Colour is only a
+// secondary cue — the <ins>/<del> elements and the visually-hidden
+// "Added"/"Removed" labels carry the meaning on their own.
+function VersionDiff({
+  fromVersion,
+  currentVersionNumber,
+  oldContent,
+  currentContent,
+}: {
+  fromVersion: number;
+  currentVersionNumber: number;
+  oldContent: string;
+  currentContent: string;
+}) {
+  const parts = buildWordDiff(oldContent, currentContent);
+
+  return (
+    <div className={styles.diffBox}>
+      <p className={styles.diffCaption}>
+        Changes since v{fromVersion} → Current · v{currentVersionNumber}
+      </p>
+      {hasContentChanges(parts) ? (
+        <p className={styles.diffText}>
+          {parts.map((part, i) => {
+            if (part.kind === "added") {
+              return (
+                <ins key={i} className={styles.diffAdded}>
+                  <span className={styles.srOnly}>Added: </span>
+                  {part.value}
+                </ins>
+              );
+            }
+            if (part.kind === "removed") {
+              return (
+                <del key={i} className={styles.diffRemoved}>
+                  <span className={styles.srOnly}>Removed: </span>
+                  {part.value}
+                </del>
+              );
+            }
+            return <span key={i}>{part.value}</span>;
+          })}
+        </p>
+      ) : (
+        <p className={styles.diffEmpty}>No content differences.</p>
+      )}
+    </div>
   );
 }

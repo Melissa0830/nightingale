@@ -3,6 +3,7 @@ Nightingale — Third-Party Attribution
 Runtime Dependencies
 - @prisma/adapter-pg | 7.10.0 | Apache-2.0 | https://github.com/prisma/prisma
 - @prisma/client | 7.10.0 | Apache-2.0 | https://github.com/prisma/prisma
+- diff | 9.0.0 | BSD-3-Clause | https://github.com/kpdecker/jsdiff | word-level Timeline version diff (UI layer)
 - dotenv | 17.4.2 | BSD-2-Clause | https://github.com/motdotla/dotenv
 - jsonwebtoken | 9.0.3 | MIT | https://github.com/auth0/node-jsonwebtoken
 - next | 16.3.3 | MIT | https://github.com/vercel/next.js
