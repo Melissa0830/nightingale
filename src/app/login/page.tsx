@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { setToken } from "@/lib/auth-client";
+import { setToken, fetchMe } from "@/lib/auth-client";
 import styles from "./login.module.css";
 
 // POST /api/auth/login currently accepts only { email } — no password
@@ -41,7 +41,18 @@ export default function LoginPage() {
         return;
       }
       setToken(data.token);
-      router.replace("/");
+      // Land on the destination this role actually uses, instead of the
+      // "/" placeholder: internal roles get the Patients directory, a
+      // Patient goes straight to their own record. Reuses the existing
+      // GET /api/auth/me read — no change to the login/JWT contract. If
+      // the identity read fails, fall back to "/patients" (which itself
+      // redirects a Patient onward to their record).
+      const me = await fetchMe(data.token);
+      const destination =
+        me?.role === "Patient" && me.patientId
+          ? `/patients/${me.patientId}`
+          : "/patients";
+      router.replace(destination);
     } catch {
       setError("Unable to sign in. Check the credentials and try again.");
     } finally {
