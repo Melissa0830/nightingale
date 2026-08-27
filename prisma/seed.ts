@@ -515,12 +515,19 @@ async function main() {
     update: { clinicId: clinicB.id, displayName: "Synthetic Learning Patient B" },
   });
 
+  // Scenario C longitudinal span — INTERMEDIATE period (Feb 2026).
+  // These three entries are a mid-course review of prior encounters, so
+  // they sit between the 2025 initial presentation and the Aug 2026
+  // current consult. Only createdAt is set here; content is unchanged
+  // because every one of these entries has linked adaptive Highlights and
+  // Highlight provenance is anchored by exact quotedText substring match.
   const learningEntrySpecs = [
     {
       id: ENTRY_LEARNING_FOLLOWUP_ID,
       patientId: patientLearning.id,
       authorId: clinicianUserA.id,
       sectionKey: "plan",
+      createdAt: new Date("2026-02-06T10:00:00.000Z"),
       content:
         "Longitudinal review across three prior encounters. Persistent cough noted at visit one. Persistent fatigue noted at visit two. Persistent dizziness reported at the most recent visit. Each was flagged for review.",
     },
@@ -529,6 +536,7 @@ async function main() {
       patientId: patientLearning.id,
       authorId: clinicianUserA.id,
       sectionKey: "medication",
+      createdAt: new Date("2026-02-06T10:15:00.000Z"),
       content:
         "Medication list reviewed. Two agents overdue for reassessment. A further agent is due for review at the next scheduled visit.",
     },
@@ -537,6 +545,7 @@ async function main() {
       patientId: patientLearning.id,
       authorId: clinicianUserA.id,
       sectionKey: "summary",
+      createdAt: new Date("2026-02-06T10:30:00.000Z"),
       content:
         "Incidental imaging findings reviewed across prior scans. Small nodule noted, stable. Minor calcification, unchanged. Trace effusion, resolving. Each judged likely incidental with no action needed.",
     },
@@ -545,6 +554,9 @@ async function main() {
       patientId: patientLearningB.id,
       authorId: clinicianUserB.id,
       sectionKey: "plan",
+      // Clinic B isolation control — not part of Scenario C's narrative,
+      // but pinned to a fixed date so the whole fixture is deterministic.
+      createdAt: new Date("2026-02-06T10:00:00.000Z"),
       content:
         "Prior clinicians recommended follow-up for persistent symptoms on three occasions; each resolved without intervention. A further persistent complaint is pending review.",
     },
@@ -560,6 +572,9 @@ async function main() {
       provenanceType: ProvenanceType.none,
       provenanceId: null,
       versionNumber: 1,
+      // Explicit, timezone-safe ISO instant. Set in both create and update
+      // so the historical date survives repeated idempotent reseeds.
+      createdAt: spec.createdAt,
     };
     await prisma.timelineEntry.upsert({
       where: { id: spec.id },
@@ -574,6 +589,12 @@ async function main() {
   // on any of these — zero lexical-bucket and zero critical-trigger surface.
   // AI Scribe summaries are pre-written clean synthetic text (no PHI); the
   // redactPHI gateway is exercised at runtime by test_ai_scribe_ingestion.py.
+  // Scenario C longitudinal span — HISTORICAL period (Apr 2025) and
+  // RECENT period (Aug 2026). None of these six entries has a linked
+  // Highlight, so createdAt is the only field being pinned here.
+  //   2025-04-15  initial presentation: patient-reported fatigue + vitals
+  //   2026-08-27  current consult, in clinical order:
+  //               patient check-in -> nurse follow-up -> doctor consult -> plan
   const learningCoreEntrySpecs = [
     {
       id: ENTRY_LEARNING_PATIENT_SUMMARY_ID,
@@ -583,6 +604,7 @@ async function main() {
       sectionKey: null as string | null,
       provenanceType: ProvenanceType.none,
       provenanceId: null as string | null,
+      createdAt: new Date("2025-04-15T09:00:00.000Z"),
       content:
         "Patient reports intermittent fatigue during daily activities over the past few weeks. Symptoms are stable today with no new concerns, and a routine follow-up is planned.",
     },
@@ -594,6 +616,7 @@ async function main() {
       sectionKey: "staff_note",
       provenanceType: ProvenanceType.none,
       provenanceId: null,
+      createdAt: new Date("2025-04-15T09:30:00.000Z"),
       content:
         "Vitals reviewed and within normal range. Patient comfortable at rest and ambulating without difficulty. Follow-up instructions confirmed and understood.",
     },
@@ -605,6 +628,7 @@ async function main() {
       sectionKey: "plan",
       provenanceType: ProvenanceType.none,
       provenanceId: null,
+      createdAt: new Date("2026-08-27T10:00:00.000Z"),
       content:
         "Continue symptom monitoring and lifestyle measures. Review energy levels and sleep pattern at the scheduled follow-up appointment in four weeks.",
     },
@@ -616,6 +640,7 @@ async function main() {
       sectionKey: "summary",
       provenanceType: ProvenanceType.doctor_consult,
       provenanceId: SESSION_LEARNING_DOCTOR,
+      createdAt: new Date("2026-08-27T09:30:00.000Z"),
       content:
         "AI Scribe Summary (doctor_consult): post-consult review of intermittent fatigue; most likely related to a recent change in sleep pattern. Advised sleep hygiene measures and follow-up in four weeks.",
     },
@@ -627,6 +652,7 @@ async function main() {
       sectionKey: "summary",
       provenanceType: ProvenanceType.nurse_consult,
       provenanceId: SESSION_LEARNING_NURSE,
+      createdAt: new Date("2026-08-27T09:00:00.000Z"),
       content:
         "AI Scribe Summary (nurse_consult): nurse follow-up covering activity pacing, hydration, and rest planning. Patient understands the plan and will track daily energy levels before the next visit.",
     },
@@ -638,6 +664,7 @@ async function main() {
       sectionKey: "summary",
       provenanceType: ProvenanceType.patient_session,
       provenanceId: SESSION_LEARNING_PATIENT,
+      createdAt: new Date("2026-08-27T08:30:00.000Z"),
       content:
         "AI Scribe Summary (patient_session): pre-visit check-in. Patient describes stable fatigue, no new symptoms, and confirms the upcoming appointment and current supportive measures.",
     },
@@ -653,6 +680,9 @@ async function main() {
       provenanceType: spec.provenanceType,
       provenanceId: spec.provenanceId,
       versionNumber: 1,
+      // Explicit, timezone-safe ISO instant. Set in both create and update
+      // so the historical date survives repeated idempotent reseeds.
+      createdAt: spec.createdAt,
     };
     await prisma.timelineEntry.upsert({
       where: { id: spec.id },
