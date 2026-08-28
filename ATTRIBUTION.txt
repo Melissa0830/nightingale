@@ -1,24 +1,134 @@
-Nightingale — Third-Party Attribution
+Nightingale — Attribution
 
-Runtime Dependencies
-- @prisma/adapter-pg | 7.10.0 | Apache-2.0 | https://github.com/prisma/prisma
-- @prisma/client | 7.10.0 | Apache-2.0 | https://github.com/prisma/prisma
-- diff | 9.0.0 | BSD-3-Clause | https://github.com/kpdecker/jsdiff | word-level Timeline version diff (UI layer)
-- dotenv | 17.4.2 | BSD-2-Clause | https://github.com/motdotla/dotenv
-- jsonwebtoken | 9.0.3 | MIT | https://github.com/auth0/node-jsonwebtoken
-- next | 16.3.3 | MIT | https://github.com/vercel/next.js
-- pg | 8.23.0 | MIT | https://github.com/brianc/node-postgres
-- react | 19.2.8 | MIT | https://github.com/facebook/react
-- react-dom | 19.2.8 | MIT | https://github.com/facebook/react
+This file lists the principal third-party components directly used by the
+project, the AI runtime boundary of the submitted application, the
+AI-assisted development process, and the origin of the demo data.
 
-Development Dependencies
-- @types/jsonwebtoken | 9.0.10 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
-- @types/node | 20.19.43 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
-- @types/pg | 8.23.1 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
-- @types/react | 19.2.18 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
-- @types/react-dom | 19.2.5 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped
-- eslint | 9.39.5 | MIT | https://github.com/eslint/eslint
-- eslint-config-next | 16.3.3 | MIT | https://github.com/vercel/next.js
-- prisma | 7.10.0 | Apache-2.0 | https://github.com/prisma/prisma
-- tsx | 4.23.12 | MIT | https://github.com/privatenumber/tsx
-- typescript | 5.9.3 | Apache-2.0 | https://github.com/microsoft/TypeScript
+License identifiers below were verified from locally installed package
+metadata (node_modules/<package>/package.json), except where explicitly
+noted otherwise. Transitive npm dependencies retain their respective
+upstream licenses. No ownership is claimed over any third-party library.
+
+
+1. Principal runtime libraries
+------------------------------------------------------------------------
+
+next               16.3.3   MIT           https://github.com/vercel/next.js
+  App Router, API route handlers, production build and start.
+
+react              19.2.8   MIT           https://github.com/facebook/react
+react-dom          19.2.8   MIT           https://github.com/facebook/react
+  Client-side UI components and rendering.
+
+@prisma/client     7.10.0   Apache-2.0    https://github.com/prisma/prisma
+  ORM and data access. Generated client output in src/generated/prisma.
+
+@prisma/adapter-pg 7.10.0   Apache-2.0    https://github.com/prisma/prisma
+  Prisma 7 driver adapter; connects the Prisma client to PostgreSQL
+  through the pg driver (src/lib/prisma.ts, prisma/seed.ts).
+
+pg                 8.23.0   MIT           https://github.com/brianc/node-postgres
+  PostgreSQL driver used underneath the Prisma pg adapter.
+
+diff               9.0.0    BSD-3-Clause  https://github.com/kpdecker/jsdiff
+  Word-level Timeline version diff, UI layer only
+  (src/lib/diff/word-diff.ts, diffWordsWithSpace). The database stores
+  full content snapshots; diffing is not persisted.
+
+jsonwebtoken       9.0.3    MIT           https://github.com/auth0/node-jsonwebtoken
+  Signs and verifies session tokens (src/lib/auth/jwt.ts).
+
+dotenv             17.4.2   BSD-2-Clause  https://github.com/motdotla/dotenv
+  Loads DATABASE_URL for the Prisma CLI config and the seed script
+  (prisma7.config.ts, prisma/seed.ts). Not imported by the Next.js
+  application runtime.
+
+
+2. Development-only tooling
+------------------------------------------------------------------------
+
+typescript          5.9.3     Apache-2.0  https://github.com/microsoft/TypeScript
+  Type checking and compilation.
+
+prisma              7.10.0    Apache-2.0  https://github.com/prisma/prisma
+  Schema, migrations, and client generation (CLI).
+
+tsx                 4.23.12   MIT         https://github.com/privatenumber/tsx
+  Runs the TypeScript seed script (prisma/seed.ts).
+
+eslint              9.39.5    MIT         https://github.com/eslint/eslint
+eslint-config-next  16.3.3    MIT         https://github.com/vercel/next.js
+  Linting and lint configuration.
+
+@types/node         20.19.43  MIT         https://github.com/DefinitelyTyped/DefinitelyTyped
+@types/react        19.2.18   MIT         https://github.com/DefinitelyTyped/DefinitelyTyped
+@types/react-dom    19.2.5    MIT         https://github.com/DefinitelyTyped/DefinitelyTyped
+@types/pg           8.23.1    MIT         https://github.com/DefinitelyTyped/DefinitelyTyped
+@types/jsonwebtoken 9.0.10    MIT         https://github.com/DefinitelyTyped/DefinitelyTyped
+  TypeScript type definitions only.
+
+
+3. Fonts and project scaffolding
+------------------------------------------------------------------------
+
+Geist and Geist Mono — the application's UI typeface. Loaded at build
+time via next/font/google (src/app/layout.tsx) and self-hosted in the
+build output. Published by Vercel (https://vercel.com/font). No font
+files are committed to this repository. The font license was not
+independently verified from local package metadata.
+
+The initial project skeleton (Next.js app structure, tsconfig, ESLint
+config, and the unused placeholder SVG files under public/ and the
+favicon) was generated by create-next-app and is covered by the Next.js
+(MIT) license listed above.
+
+
+4. AI / LLM runtime boundary
+------------------------------------------------------------------------
+
+The submitted prototype uses a deterministic local MockLlmAdapter at the
+AI Scribe inference boundary (src/lib/ai/llm-adapter.ts). Its output is a
+pure function of its input. No external LLM API is invoked by the
+submitted application: no OpenAI, Anthropic / Claude, or other hosted
+model service is called at runtime, and no model API key is required.
+
+AI Scribe ingestion, PHI redaction, persistence, provenance, and audit
+logging are real (src/app/api/patients/[id]/ai-scribe/route.ts); only the
+summarization step is mocked. No external machine-learning model is
+bundled or distributed with this project.
+
+
+5. AI-assisted development process
+------------------------------------------------------------------------
+
+Development of this prototype used a structured, prompt-driven workflow
+with an AI coding assistant (Claude), including feature implementation,
+automated test creation, iterative debugging, documentation work, and
+evidence-based review gates. The workflow used explicit STOP conditions
+when evidence was insufficient or when repository state did not match
+assumptions. Final code, tests, architecture claims, performance
+evidence, and submission statements were checked against the final
+repository state rather than inferred from planning documents.
+
+Human direction remained part of the process throughout: scope
+decisions, acceptance or rejection of proposed changes, manual browser
+verification, and repository review were performed by the author. This
+was not test-driven development — implementation was followed by targeted
+automated regression, iterative debugging, and evidence review. Browser
+and render behaviour was verified manually, not by an automated
+end-to-end suite.
+
+The three earliest bootstrap commits carry historical
+"Co-Authored-By: Claude Sonnet 4.6" trailers; later commits do not. Git
+history has not been rewritten.
+
+This section describes the development process only. It does not change
+the runtime boundary stated in section 4.
+
+
+6. Demo data
+------------------------------------------------------------------------
+
+All demo clinics, users, and patient records are synthetic and were
+created for this prototype (prisma/seed.ts). No real patient data and no
+external clinical dataset were used.
