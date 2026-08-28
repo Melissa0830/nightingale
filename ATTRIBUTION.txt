@@ -71,11 +71,17 @@ eslint-config-next  16.3.3    MIT         https://github.com/vercel/next.js
 3. Fonts and project scaffolding
 ------------------------------------------------------------------------
 
-Geist and Geist Mono — the application's UI typeface. Loaded at build
-time via next/font/google (src/app/layout.tsx) and self-hosted in the
-build output. Published by Vercel (https://vercel.com/font). No font
-files are committed to this repository. The font license was not
-independently verified from local package metadata.
+Geist and Geist Mono — SIL Open Font License 1.1 (OFL-1.1) — the
+application's UI typeface, published by Vercel (https://vercel.com/font).
+Loaded at build time via next/font/google (src/app/layout.tsx) and
+self-hosted in the build output; no font files are committed to or
+redistributed directly by this repository. The OFL-1.1 license was
+verified from name-table metadata embedded in the Geist font files
+bundled inside the installed next package
+(node_modules/next/.../Geist-Regular.ttf carries the full "This Font
+Software is licensed under the SIL Open Font License, Version 1.1"
+statement; the Geist Mono file carries the same "The Geist Project
+Authors" copyright and the https://openfontlicense.org license URL).
 
 The initial project skeleton (Next.js app structure, tsconfig, ESLint
 config, and the unused placeholder SVG files under public/ and the
